@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, ViewChild } from '@angular/core'
 import { AuthService, ConfirmService, Notifier, ServerService, UserService } from '@app/core'
 import { Account, DropdownAction } from '@app/shared/shared-main'
-import { BulkRemoveCommentsOfBody, ServerConfig, User, UserRight } from '@shared/models'
+import { BulkRemoveCommentsOfBody, User, UserRight } from '@shared/models'
 import { BlocklistService } from './blocklist.service'
 import { BulkService } from './bulk.service'
 import { UserBanModalComponent } from './user-ban-modal.component'
@@ -18,6 +18,7 @@ export class UserModerationDropdownComponent implements OnInit, OnChanges {
   @Input() prependActions: DropdownAction<{ user: User, account: Account }>[]
 
   @Input() buttonSize: 'normal' | 'small' = 'normal'
+  @Input() buttonStyled = true
   @Input() placement = 'right-top right-bottom auto'
   @Input() label: string
   @Input() container: 'body' | undefined = undefined
@@ -27,7 +28,7 @@ export class UserModerationDropdownComponent implements OnInit, OnChanges {
 
   userActions: DropdownAction<{ user: User, account: Account }>[][] = []
 
-  private serverConfig: ServerConfig
+  requiresEmailVerification = false
 
   constructor (
     private authService: AuthService,
@@ -39,14 +40,9 @@ export class UserModerationDropdownComponent implements OnInit, OnChanges {
     private bulkService: BulkService
   ) { }
 
-  get requiresEmailVerification () {
-    return this.serverConfig.signup.requiresEmailVerification
-  }
-
-  ngOnInit (): void {
-    this.serverConfig = this.serverService.getTmpConfig()
+  ngOnInit () {
     this.serverService.getConfig()
-      .subscribe(config => this.serverConfig = config)
+      .subscribe(config => this.requiresEmailVerification = config.signup.requiresEmailVerification)
   }
 
   ngOnChanges () {

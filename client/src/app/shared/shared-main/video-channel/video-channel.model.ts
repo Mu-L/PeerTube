@@ -16,16 +16,17 @@ export class VideoChannel extends Actor implements ServerVideoChannel {
   banner: ActorImage
   bannerUrl: string
 
+  updatedAt: Date | string
+
   ownerAccount?: ServerAccount
   ownerBy?: string
-  ownerAvatarUrl?: string
 
   videosCount?: number
 
   viewsPerDay?: ViewsPerDate[]
 
   static GET_ACTOR_AVATAR_URL (actor: object) {
-    return Actor.GET_ACTOR_AVATAR_URL(actor) || this.GET_DEFAULT_AVATAR_URL()
+    return Actor.GET_ACTOR_AVATAR_URL(actor)
   }
 
   static GET_ACTOR_BANNER_URL (channel: ServerVideoChannel) {
@@ -60,6 +61,8 @@ export class VideoChannel extends Actor implements ServerVideoChannel {
 
     this.videosCount = hash.videosCount
 
+    if (hash.updatedAt) this.updatedAt = new Date(hash.updatedAt.toString())
+
     if (hash.viewsPerDay) {
       this.viewsPerDay = hash.viewsPerDay.map(v => ({ ...v, date: new Date(v.date) }))
     }
@@ -67,7 +70,6 @@ export class VideoChannel extends Actor implements ServerVideoChannel {
     if (hash.ownerAccount) {
       this.ownerAccount = hash.ownerAccount
       this.ownerBy = Actor.CREATE_BY_STRING(hash.ownerAccount.name, hash.ownerAccount.host)
-      this.ownerAvatarUrl = Account.GET_ACTOR_AVATAR_URL(this.ownerAccount)
     }
 
     this.updateComputedAttributes()
@@ -94,7 +96,6 @@ export class VideoChannel extends Actor implements ServerVideoChannel {
   }
 
   updateComputedAttributes () {
-    this.avatarUrl = VideoChannel.GET_ACTOR_AVATAR_URL(this)
     this.bannerUrl = VideoChannel.GET_ACTOR_BANNER_URL(this)
   }
 }

@@ -134,6 +134,11 @@ const CONFIG = {
     REPORT_ONLY: config.get<boolean>('csp.report_only'),
     REPORT_URI: config.get<string>('csp.report_uri')
   },
+  SECURITY: {
+    FRAMEGUARD: {
+      ENABLED: config.get<boolean>('security.frameguard.enabled')
+    }
+  },
   TRACKER: {
     ENABLED: config.get<boolean>('tracker.enabled'),
     PRIVATE: config.get<boolean>('tracker.private'),
@@ -180,6 +185,7 @@ const CONFIG = {
     get ENABLED () { return config.get<boolean>('signup.enabled') },
     get LIMIT () { return config.get<number>('signup.limit') },
     get REQUIRES_EMAIL_VERIFICATION () { return config.get<boolean>('signup.requires_email_verification') },
+    get MINIMUM_AGE () { return config.get<number>('signup.minimum_age') },
     FILTERS: {
       CIDR: {
         get WHITELIST () { return config.get<string[]>('signup.filters.cidr.whitelist') },

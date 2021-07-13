@@ -11,7 +11,9 @@ import {
   Output
 } from '@angular/core'
 import { AuthService, ScreenService, ServerService, User } from '@app/core'
-import { ServerConfig, VideoPlaylistType, VideoPrivacy, VideoState } from '@shared/models'
+import { HTMLServerConfig, VideoPlaylistType, VideoPrivacy, VideoState } from '@shared/models'
+import { LinkType } from '../../../types/link.type'
+import { ActorAvatarSize } from '../shared-actor-image/actor-avatar.component'
 import { Video } from '../shared-main'
 import { VideoPlaylistService } from '../shared-video-playlist'
 import { VideoActionsDisplayType } from './video-actions-dropdown.component'
@@ -27,8 +29,6 @@ export type MiniatureDisplayOptions = {
   blacklistInfo?: boolean
   nsfw?: boolean
 }
-export type VideoLinkType = 'internal' | 'lazy-load' | 'external'
-
 @Component({
   selector: 'my-video-miniature',
   styleUrls: [ './video-miniature.component.scss' ],
@@ -51,9 +51,11 @@ export class VideoMiniatureComponent implements OnInit {
   }
   @Input() displayVideoActions = true
 
+  @Input() actorImageSize: ActorAvatarSize = '40'
+
   @Input() displayAsRow = false
 
-  @Input() videoLinkType: VideoLinkType = 'internal'
+  @Input() videoLinkType: LinkType = 'internal'
 
   @Output() videoBlocked = new EventEmitter()
   @Output() videoUnblocked = new EventEmitter()
@@ -71,7 +73,7 @@ export class VideoMiniatureComponent implements OnInit {
     mute: true
   }
   showActions = false
-  serverConfig: ServerConfig
+  serverConfig: HTMLServerConfig
 
   addToWatchLaterText: string
   addedToWatchLaterText: string
@@ -83,7 +85,7 @@ export class VideoMiniatureComponent implements OnInit {
     playlistElementId?: number
   }
 
-  videoRouterLink: any[] = []
+  videoRouterLink: string | any[] = []
   videoHref: string
   videoTarget: string
 
@@ -103,12 +105,8 @@ export class VideoMiniatureComponent implements OnInit {
   }
 
   ngOnInit () {
-    this.serverConfig = this.serverService.getTmpConfig()
-    this.serverService.getConfig()
-        .subscribe(config => {
-          this.serverConfig = config
-          this.buildVideoLink()
-        })
+    this.serverConfig = this.serverService.getHTMLConfig()
+    this.buildVideoLink()
 
     this.setUpBy()
 
@@ -122,7 +120,7 @@ export class VideoMiniatureComponent implements OnInit {
 
   buildVideoLink () {
     if (this.videoLinkType === 'internal' || !this.video.url) {
-      this.videoRouterLink = [ '/videos/watch', this.video.uuid ]
+      this.videoRouterLink = Video.buildWatchUrl(this.video)
       return
     }
 
@@ -178,14 +176,6 @@ export class VideoMiniatureComponent implements OnInit {
     }
 
     return ''
-  }
-
-  getAvatarUrl () {
-    if (this.displayOwnerAccount()) {
-      return this.video.accountAvatarUrl
-    }
-
-    return this.video.videoChannelAvatarUrl
   }
 
   loadActions () {

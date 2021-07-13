@@ -1,5 +1,6 @@
 import * as express from 'express'
 import * as Feed from 'pfeed'
+import { getCategoryLabel } from '@server/models/video/formatter/video-format-utils'
 import { VideoFilter } from '../../shared/models/videos/video-query.type'
 import { buildNSFWFilter } from '../helpers/express-utils'
 import { CONFIG } from '../initializers/config'
@@ -167,7 +168,7 @@ async function generateVideoFeed (req: express.Request, res: express.Response) {
     videoChannelId: videoChannel ? videoChannel.id : null
   }
 
-  const resultList = await VideoModel.listForApi({
+  const { data } = await VideoModel.listForApi({
     start,
     count: FEEDS.COUNT,
     sort: req.query.sort,
@@ -175,10 +176,11 @@ async function generateVideoFeed (req: express.Request, res: express.Response) {
     nsfw,
     filter: req.query.filter as VideoFilter,
     withFiles: true,
+    countVideos: false,
     ...options
   })
 
-  addVideosToFeed(feed, resultList.data)
+  addVideosToFeed(feed, data)
 
   // Now the feed generation is done, let's send it!
   return sendFeed(feed, req, res)
@@ -198,20 +200,22 @@ async function generateVideoFeedForSubscriptions (req: express.Request, res: exp
     queryString: new URL(WEBSERVER.URL + req.url).search
   })
 
-  const resultList = await VideoModel.listForApi({
+  const { data } = await VideoModel.listForApi({
     start,
     count: FEEDS.COUNT,
     sort: req.query.sort,
     includeLocalVideos: false,
     nsfw,
     filter: req.query.filter as VideoFilter,
+
     withFiles: true,
+    countVideos: false,
 
     followerActorId: res.locals.user.Account.Actor.id,
     user: res.locals.user
   })
 
-  addVideosToFeed(feed, resultList.data)
+  addVideosToFeed(feed, data)
 
   // Now the feed generation is done, let's send it!
   return sendFeed(feed, req, res)
@@ -283,14 +287,14 @@ function addVideosToFeed (feed, videos: VideoModel[]) {
     if (video.category) {
       categories.push({
         value: video.category,
-        label: VideoModel.getCategoryLabel(video.category)
+        label: getCategoryLabel(video.category)
       })
     }
 
     feed.addItem({
       title: video.name,
       id: video.url,
-      link: WEBSERVER.URL + '/videos/watch/' + video.uuid,
+      link: WEBSERVER.URL + '/w/' + video.uuid,
       description: video.getTruncatedDescription(),
       content: video.description,
       author: [

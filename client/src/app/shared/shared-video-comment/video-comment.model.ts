@@ -1,5 +1,5 @@
 import { getAbsoluteAPIUrl } from '@app/helpers'
-import { Account, Actor } from '@app/shared/shared-main'
+import { Account, Actor, Video } from '@app/shared/shared-main'
 import { Account as AccountInterface, VideoComment as VideoCommentServerModel, VideoCommentAdmin as VideoCommentAdminServerModel } from '@shared/models'
 
 export class VideoComment implements VideoCommentServerModel {
@@ -17,7 +17,6 @@ export class VideoComment implements VideoCommentServerModel {
   totalRepliesFromVideoAuthor: number
   totalReplies: number
   by: string
-  accountAvatarUrl: string
 
   isLocal: boolean
 
@@ -38,7 +37,6 @@ export class VideoComment implements VideoCommentServerModel {
 
     if (this.account) {
       this.by = Actor.CREATE_BY_STRING(this.account.name, this.account.host)
-      this.accountAvatarUrl = Account.GET_ACTOR_AVATAR_URL(this.account)
 
       const absoluteAPIUrl = getAbsoluteAPIUrl()
       const thisHost = new URL(absoluteAPIUrl).host
@@ -70,7 +68,6 @@ export class VideoCommentAdmin implements VideoCommentAdminServerModel {
   }
 
   by: string
-  accountAvatarUrl: string
 
   constructor (hash: VideoCommentAdminServerModel, textHtml: string) {
     this.id = hash.id
@@ -88,7 +85,7 @@ export class VideoCommentAdmin implements VideoCommentAdminServerModel {
       id: hash.video.id,
       uuid: hash.video.uuid,
       name: hash.video.name,
-      localUrl: '/videos/watch/' + hash.video.uuid
+      localUrl: Video.buildWatchUrl(hash.video)
     }
 
     this.localUrl = this.video.localUrl + ';threadId=' + this.threadId
@@ -97,9 +94,8 @@ export class VideoCommentAdmin implements VideoCommentAdminServerModel {
 
     if (this.account) {
       this.by = Actor.CREATE_BY_STRING(this.account.name, this.account.host)
-      this.accountAvatarUrl = Account.GET_ACTOR_AVATAR_URL(this.account)
 
-      this.account.localUrl = '/accounts/' + this.by
+      this.account.localUrl = '/a/' + this.by
     }
   }
 }

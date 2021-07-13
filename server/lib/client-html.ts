@@ -2,12 +2,14 @@ import * as express from 'express'
 import { readFile } from 'fs-extra'
 import { join } from 'path'
 import validator from 'validator'
+import { escapeHTML } from '@shared/core-utils/renderer'
+import { HTMLServerConfig } from '@shared/models'
 import { buildFileLocale, getDefaultLocale, is18nLocale, POSSIBLE_LOCALES } from '../../shared/core-utils/i18n/i18n'
 import { HttpStatusCode } from '../../shared/core-utils/miscs/http-error-codes'
 import { VideoPlaylistPrivacy, VideoPrivacy } from '../../shared/models/videos'
 import { isTestInstance, sha256 } from '../helpers/core-utils'
-import { escapeHTML } from '@shared/core-utils/renderer'
 import { logger } from '../helpers/logger'
+import { mdToPlainText } from '../helpers/markdown'
 import { CONFIG } from '../initializers/config'
 import {
   ACCEPT_HEADERS,
@@ -19,11 +21,13 @@ import {
   WEBSERVER
 } from '../initializers/constants'
 import { AccountModel } from '../models/account/account'
+import { getActivityStreamDuration } from '../models/video/formatter/video-format-utils'
 import { VideoModel } from '../models/video/video'
 import { VideoChannelModel } from '../models/video/video-channel'
-import { getActivityStreamDuration } from '../models/video/video-format-utils'
 import { VideoPlaylistModel } from '../models/video/video-playlist'
 import { MAccountActor, MChannelActor } from '../types/models'
+import { ServerConfigManager } from './server-config-manager'
+import { toCompleteUUID } from '@server/helpers/custom-validators/misc'
 
 type Tags = {
   ogType: string
@@ -75,7 +79,9 @@ class ClientHtml {
     return customHtml
   }
 
-  static async getWatchHTMLPage (videoId: string, req: express.Request, res: express.Response) {
+  static async getWatchHTMLPage (videoIdArg: string, req: express.Request, res: express.Response) {
+    const videoId = toCompleteUUID(videoIdArg)
+
     // Let Angular application handle errors
     if (!validator.isInt(videoId) && !validator.isUUID(videoId, 4)) {
       res.status(HttpStatusCode.NOT_FOUND_404)
@@ -94,13 +100,13 @@ class ClientHtml {
     }
 
     let customHtml = ClientHtml.addTitleTag(html, escapeHTML(video.name))
-    customHtml = ClientHtml.addDescriptionTag(customHtml, escapeHTML(video.description))
+    customHtml = ClientHtml.addDescriptionTag(customHtml, mdToPlainText(video.description))
 
     const url = WEBSERVER.URL + video.getWatchStaticPath()
     const originUrl = video.url
     const title = escapeHTML(video.name)
     const siteName = escapeHTML(CONFIG.INSTANCE.NAME)
-    const description = escapeHTML(video.description)
+    const description = mdToPlainText(video.description)
 
     const image = {
       url: WEBSERVER.URL + video.getPreviewStaticPath()
@@ -133,7 +139,9 @@ class ClientHtml {
     return customHtml
   }
 
-  static async getWatchPlaylistHTMLPage (videoPlaylistId: string, req: express.Request, res: express.Response) {
+  static async getWatchPlaylistHTMLPage (videoPlaylistIdArg: string, req: express.Request, res: express.Response) {
+    const videoPlaylistId = toCompleteUUID(videoPlaylistIdArg)
+
     // Let Angular application handle errors
     if (!validator.isInt(videoPlaylistId) && !validator.isUUID(videoPlaylistId, 4)) {
       res.status(HttpStatusCode.NOT_FOUND_404)
@@ -152,13 +160,13 @@ class ClientHtml {
     }
 
     let customHtml = ClientHtml.addTitleTag(html, escapeHTML(videoPlaylist.name))
-    customHtml = ClientHtml.addDescriptionTag(customHtml, escapeHTML(videoPlaylist.description))
+    customHtml = ClientHtml.addDescriptionTag(customHtml, mdToPlainText(videoPlaylist.description))
 
     const url = videoPlaylist.getWatchUrl()
     const originUrl = videoPlaylist.url
     const title = escapeHTML(videoPlaylist.name)
     const siteName = escapeHTML(CONFIG.INSTANCE.NAME)
-    const description = escapeHTML(videoPlaylist.description)
+    const description = mdToPlainText(videoPlaylist.description)
 
     const image = {
       url: videoPlaylist.getThumbnailUrl()
@@ -195,11 +203,22 @@ class ClientHtml {
   }
 
   static async getAccountHTMLPage (nameWithHost: string, req: express.Request, res: express.Response) {
-    return this.getAccountOrChannelHTMLPage(() => AccountModel.loadByNameWithHost(nameWithHost), req, res)
+    const accountModelPromise = AccountModel.loadByNameWithHost(nameWithHost)
+    return this.getAccountOrChannelHTMLPage(() => accountModelPromise, req, res)
   }
 
   static async getVideoChannelHTMLPage (nameWithHost: string, req: express.Request, res: express.Response) {
-    return this.getAccountOrChannelHTMLPage(() => VideoChannelModel.loadByNameWithHostAndPopulateAccount(nameWithHost), req, res)
+    const videoChannelModelPromise = VideoChannelModel.loadByNameWithHostAndPopulateAccount(nameWithHost)
+    return this.getAccountOrChannelHTMLPage(() => videoChannelModelPromise, req, res)
+  }
+
+  static async getActorHTMLPage (nameWithHost: string, req: express.Request, res: express.Response) {
+    const [ account, channel ] = await Promise.all([
+      AccountModel.loadByNameWithHost(nameWithHost),
+      VideoChannelModel.loadByNameWithHostAndPopulateAccount(nameWithHost)
+    ])
+
+    return this.getAccountOrChannelHTMLPage(() => Promise.resolve(account || channel), req, res)
   }
 
   static async getEmbedHTML () {
@@ -208,11 +227,14 @@ class ClientHtml {
     if (!isTestInstance() && ClientHtml.htmlCache[path]) return ClientHtml.htmlCache[path]
 
     const buffer = await readFile(path)
+    const serverConfig = await ServerConfigManager.Instance.getHTMLServerConfig()
 
     let html = buffer.toString()
     html = await ClientHtml.addAsyncPluginCSS(html)
     html = ClientHtml.addCustomCSS(html)
     html = ClientHtml.addTitleTag(html)
+    html = ClientHtml.addDescriptionTag(html)
+    html = ClientHtml.addServerConfig(html, serverConfig)
 
     ClientHtml.htmlCache[path] = html
 
@@ -236,13 +258,13 @@ class ClientHtml {
     }
 
     let customHtml = ClientHtml.addTitleTag(html, escapeHTML(entity.getDisplayName()))
-    customHtml = ClientHtml.addDescriptionTag(customHtml, escapeHTML(entity.description))
+    customHtml = ClientHtml.addDescriptionTag(customHtml, mdToPlainText(entity.description))
 
     const url = entity.getLocalUrl()
     const originUrl = entity.Actor.url
     const siteName = escapeHTML(CONFIG.INSTANCE.NAME)
     const title = escapeHTML(entity.getDisplayName())
-    const description = escapeHTML(entity.description)
+    const description = mdToPlainText(entity.description)
 
     const image = {
       url: entity.Actor.getAvatarUrl(),
@@ -274,6 +296,7 @@ class ClientHtml {
     if (!isTestInstance() && ClientHtml.htmlCache[path]) return ClientHtml.htmlCache[path]
 
     const buffer = await readFile(path)
+    const serverConfig = await ServerConfigManager.Instance.getHTMLServerConfig()
 
     let html = buffer.toString()
 
@@ -282,6 +305,7 @@ class ClientHtml {
     html = ClientHtml.addFaviconContentHash(html)
     html = ClientHtml.addLogoContentHash(html)
     html = ClientHtml.addCustomCSS(html)
+    html = ClientHtml.addServerConfig(html, serverConfig)
     html = await ClientHtml.addAsyncPluginCSS(html)
 
     ClientHtml.htmlCache[path] = html
@@ -354,6 +378,13 @@ class ClientHtml {
     return htmlStringPage.replace(CUSTOM_HTML_TAG_COMMENTS.CUSTOM_CSS, styleTag)
   }
 
+  private static addServerConfig (htmlStringPage: string, serverConfig: HTMLServerConfig) {
+    const serverConfigString = JSON.stringify(serverConfig)
+    const configScriptTag = `<script type="application/javascript">window.PeerTubeServerConfig = '${serverConfigString}'</script>`
+
+    return htmlStringPage.replace(CUSTOM_HTML_TAG_COMMENTS.SERVER_CONFIG, configScriptTag)
+  }
+
   private static async addAsyncPluginCSS (htmlStringPage: string) {
     const globalCSSContent = await readFile(PLUGIN_GLOBAL_CSS_PATH)
     if (globalCSSContent.byteLength === 0) return htmlStringPage
@@ -378,7 +409,7 @@ class ClientHtml {
     }
 
     metaTags['og:url'] = tags.url
-    metaTags['og:description'] = tags.description
+    metaTags['og:description'] = mdToPlainText(tags.description)
 
     if (tags.embed) {
       metaTags['og:video:url'] = tags.embed.url
@@ -394,7 +425,7 @@ class ClientHtml {
   private static generateStandardMetaTags (tags: Tags) {
     return {
       name: tags.title,
-      description: tags.description,
+      description: mdToPlainText(tags.description),
       image: tags.image.url
     }
   }
@@ -523,11 +554,11 @@ async function serveIndexHTML (req: express.Request, res: express.Response) {
       return
     } catch (err) {
       logger.error('Cannot generate HTML page.', err)
-      return res.sendStatus(HttpStatusCode.INTERNAL_SERVER_ERROR_500)
+      return res.status(HttpStatusCode.INTERNAL_SERVER_ERROR_500).end()
     }
   }
 
-  return res.sendStatus(HttpStatusCode.NOT_ACCEPTABLE_406)
+  return res.status(HttpStatusCode.NOT_ACCEPTABLE_406).end()
 }
 
 // ---------------------------------------------------------------------------

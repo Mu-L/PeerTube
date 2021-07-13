@@ -3,7 +3,9 @@ import { SelectButtonModule } from 'primeng/selectbutton'
 import { TableModule } from 'primeng/table'
 import { NgModule } from '@angular/core'
 import { SharedAbuseListModule } from '@app/shared/shared-abuse-list'
-import { SharedActorImageModule } from '@app/shared/shared-actor-image'
+import { SharedActorImageEditModule } from '@app/shared/shared-actor-image-edit'
+import { SharedActorImageModule } from '@app/shared/shared-actor-image/shared-actor-image.module'
+import { SharedCustomMarkupModule } from '@app/shared/shared-custom-markup'
 import { SharedFormModule } from '@app/shared/shared-forms'
 import { SharedGlobalIconModule } from '@app/shared/shared-icons'
 import { SharedMainModule } from '@app/shared/shared-main'
@@ -17,6 +19,7 @@ import {
   EditBasicConfigurationComponent,
   EditConfigurationService,
   EditCustomConfigComponent,
+  EditHomepageComponent,
   EditInstanceInformationComponent,
   EditLiveConfigurationComponent,
   EditVODTranscodingComponent
@@ -51,6 +54,8 @@ import { UserCreateComponent, UserListComponent, UserPasswordComponent, UsersCom
     SharedAbuseListModule,
     SharedVideoCommentModule,
     SharedActorImageModule,
+    SharedActorImageEditModule,
+    SharedCustomMarkupModule,
 
     TableModule,
     SelectButtonModule,
@@ -98,7 +103,8 @@ import { UserCreateComponent, UserListComponent, UserPasswordComponent, UsersCom
     EditVODTranscodingComponent,
     EditLiveConfigurationComponent,
     EditAdvancedConfigurationComponent,
-    EditInstanceInformationComponent
+    EditInstanceInformationComponent,
+    EditHomepageComponent
   ],
 
   exports: [

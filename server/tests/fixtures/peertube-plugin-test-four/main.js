@@ -77,9 +77,32 @@ async function register ({
     })
 
     router.get('/static-route', async (req, res) => {
-      const staticRoute = await peertubeHelpers.plugin.getBaseStaticRoute()
+      const staticRoute = peertubeHelpers.plugin.getBaseStaticRoute()
 
       return res.json({ staticRoute })
+    })
+
+    router.get('/router-route', async (req, res) => {
+      const routerRoute = peertubeHelpers.plugin.getBaseRouterRoute()
+
+      return res.json({ routerRoute })
+    })
+
+    router.get('/user', async (req, res) => {
+      const user = await peertubeHelpers.user.getAuthUser(res)
+      if (!user) return res.sendStatus(404)
+
+      const isAdmin = user.role === 0
+      const isModerator = user.role === 1
+      const isUser = user.role === 2
+
+      return res.json({
+        username: user.username,
+        displayName: user.Account.name,
+        isAdmin,
+        isModerator,
+        isUser
+      })
     })
   }
 

@@ -3,13 +3,12 @@ import * as ffmpeg from 'fluent-ffmpeg'
 import { readFile, remove, writeFile } from 'fs-extra'
 import { dirname, join } from 'path'
 import { FFMPEG_NICE, VIDEO_LIVE } from '@server/initializers/constants'
-import { AvailableEncoders, EncoderOptionsBuilder, EncoderOptions, EncoderProfile, VideoResolution } from '../../shared/models/videos'
+import { AvailableEncoders, EncoderOptions, EncoderOptionsBuilder, EncoderProfile, VideoResolution } from '../../shared/models/videos'
 import { CONFIG } from '../initializers/config'
 import { execPromise, promisify0 } from './core-utils'
 import { computeFPS, getAudioStream, getVideoFileFPS } from './ffprobe-utils'
 import { processImage } from './image-utils'
 import { logger } from './logger'
-import { FilterSpecification } from 'fluent-ffmpeg'
 
 /**
  *
@@ -133,7 +132,7 @@ interface BaseTranscodeOptions {
   availableEncoders: AvailableEncoders
   profile: string
 
-  resolution: VideoResolution
+  resolution: number
 
   isPortraitMode?: boolean
 
@@ -227,7 +226,7 @@ async function getLiveTranscodingCommand (options: {
 
   const varStreamMap: string[] = []
 
-  const complexFilter: FilterSpecification[] = [
+  const complexFilter: ffmpeg.FilterSpecification[] = [
     {
       inputs: '[v:0]',
       filter: 'split',
@@ -236,7 +235,6 @@ async function getLiveTranscodingCommand (options: {
     }
   ]
 
-  command.outputOption('-preset superfast')
   command.outputOption('-sc_threshold 0')
 
   addDefaultEncoderGlobalParams({ command })
@@ -408,8 +406,7 @@ async function buildx264VODCommand (command: ffmpeg.FfmpegCommand, options: Tran
 async function buildAudioMergeCommand (command: ffmpeg.FfmpegCommand, options: MergeAudioTranscodeOptions) {
   command = command.loop(undefined)
 
-  // Avoid "height not divisible by 2" error
-  const scaleFilterValue = 'trunc(iw/2)*2:trunc(ih/2)*2'
+  const scaleFilterValue = getScaleCleanerValue()
   command = await presetVideo({ command, input: options.audioPath, transcodeOptions: options, scaleFilterValue })
 
   command.outputOption('-preset:v veryfast')
@@ -543,7 +540,7 @@ async function getEncoderBuilderResult (options: {
       }
     }
 
-    const result = await builder({ input, resolution: resolution, fps, streamNum })
+    const result = await builder({ input, resolution, fps, streamNum })
 
     return {
       result,
@@ -679,10 +676,16 @@ function getFFmpegVersion () {
 
       return execPromise(`${ffmpegPath} -version`)
         .then(stdout => {
-          const parsed = stdout.match(/ffmpeg version .?(\d+\.\d+\.\d+)/)
+          const parsed = stdout.match(/ffmpeg version .?(\d+\.\d+(\.\d+)?)/)
           if (!parsed || !parsed[1]) return rej(new Error(`Could not find ffmpeg version in ${stdout}`))
 
-          return res(parsed[1])
+          // Fix ffmpeg version that does not include patch version (4.4 for example)
+          let version = parsed[1]
+          if (version.match(/^\d+\.\d+$/)) {
+            version += '.0'
+          }
+
+          return res(version)
         })
         .catch(err => rej(err))
     })
@@ -720,6 +723,11 @@ async function runCommand (options: {
 
     command.run()
   })
+}
+
+// Avoid "height not divisible by 2" error
+function getScaleCleanerValue () {
+  return 'trunc(iw/2)*2:trunc(ih/2)*2'
 }
 
 // ---------------------------------------------------------------------------

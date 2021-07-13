@@ -19,7 +19,11 @@ export type RegisterClientOptions = {
 export type RegisterClientHelpers = {
   getBaseStaticRoute: () => string
 
+  getBaseRouterRoute: () => string
+
   isLoggedIn: () => boolean
+
+  getAuthHeader: () => { 'Authorization': string } | undefined
 
   getSettings: () => Promise<{ [ name: string ]: string }>
 

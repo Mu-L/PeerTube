@@ -26,10 +26,10 @@ import {
   PluginVideoLicenceManager,
   PluginVideoPrivacyManager,
   RegisterServerHookOptions,
-  RegisterServerSettingOptions
+  RegisterServerSettingOptions,
+  serverHookObject
 } from '@shared/models'
-import { serverHookObject } from '@shared/models/plugins/server-hook.model'
-import { VideoTranscodingProfilesManager } from '../video-transcoding-profiles'
+import { VideoTranscodingProfilesManager } from '../transcoding/video-transcoding-profiles'
 import { buildPluginHelpers } from './plugin-helpers-builder'
 
 type AlterableVideoConstant = 'language' | 'licence' | 'category' | 'privacy' | 'playlistPrivacy'
@@ -37,18 +37,20 @@ type VideoConstant = { [key in number | string]: string }
 
 type UpdatedVideoConstant = {
   [name in AlterableVideoConstant]: {
-    added: { key: number | string, label: string }[]
-    deleted: { key: number | string, label: string }[]
+    [ npmName: string]: {
+      added: { key: number | string, label: string }[]
+      deleted: { key: number | string, label: string }[]
+    }
   }
 }
 
 export class RegisterHelpers {
   private readonly updatedVideoConstants: UpdatedVideoConstant = {
-    playlistPrivacy: { added: [], deleted: [] },
-    privacy: { added: [], deleted: [] },
-    language: { added: [], deleted: [] },
-    licence: { added: [], deleted: [] },
-    category: { added: [], deleted: [] }
+    playlistPrivacy: { },
+    privacy: { },
+    language: { },
+    licence: { },
+    category: { }
   }
 
   private readonly transcodingProfiles: {
@@ -73,7 +75,7 @@ export class RegisterHelpers {
   private idAndPassAuths: RegisterServerAuthPassOptions[] = []
   private externalAuths: RegisterServerAuthExternalOptions[] = []
 
-  private readonly onSettingsChangeCallbacks: ((settings: any) => void)[] = []
+  private readonly onSettingsChangeCallbacks: ((settings: any) => Promise<any>)[] = []
 
   private readonly router: express.Router
 
@@ -277,7 +279,7 @@ export class RegisterHelpers {
 
       setSetting: (name: string, value: string) => PluginModel.setSetting(this.plugin.name, this.plugin.type, name, value),
 
-      onSettingsChange: (cb: (settings: any) => void) => this.onSettingsChangeCallbacks.push(cb)
+      onSettingsChange: (cb: (settings: any) => Promise<any>) => this.onSettingsChangeCallbacks.push(cb)
     }
   }
 
@@ -377,7 +379,7 @@ export class RegisterHelpers {
     const { npmName, type, obj, key } = parameters
 
     if (!obj[key]) {
-      logger.warn('Cannot delete %s %s by plugin %s: key does not exist.', type, npmName, key)
+      logger.warn('Cannot delete %s by plugin %s: key %s does not exist.', type, npmName, key)
       return false
     }
 
@@ -388,7 +390,15 @@ export class RegisterHelpers {
       }
     }
 
-    this.updatedVideoConstants[type][npmName].deleted.push({ key, label: obj[key] })
+    const updatedConstants = this.updatedVideoConstants[type][npmName]
+
+    const alreadyAdded = updatedConstants.added.find(a => a.key === key)
+    if (alreadyAdded) {
+      updatedConstants.added.filter(a => a.key !== key)
+    } else if (obj[key]) {
+      updatedConstants.deleted.push({ key, label: obj[key] })
+    }
+
     delete obj[key]
 
     return true

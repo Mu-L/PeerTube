@@ -1,5 +1,5 @@
-@import '_variables';
-@import '_mixins';
+@use '_variables' as *;
+@use '_mixins' as *;
 
 $border-width: 3px;
 $border-type: solid;
@@ -44,7 +44,7 @@ $nav-link-height: 40px;
 
 ::ng-deep .video-add-nav {
   border-bottom: $border-width $border-type $border-color;
-  margin: 20px 0 0 0 !important;
+  margin: 20px 0 0 !important;
 
   &.hide-nav {
     display: none !important;

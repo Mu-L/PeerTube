@@ -77,7 +77,7 @@ email:
 
 # From the project root directory
 storage:
-  tmp: 'storage/tmp/' # Use to download data (imports etc), store uploaded files before processing...
+  tmp: 'storage/tmp/' # Use to download data (imports etc), store uploaded files before and during processing...
   avatars: 'storage/avatars/'
   videos: 'storage/videos/'
   streaming_playlists: 'storage/streaming-playlists/'
@@ -96,7 +96,7 @@ storage:
   client_overrides: 'storage/client-overrides/'
 
 log:
-  level: 'info' # debug/info/warning/error
+  level: 'info' # 'debug' | 'info' | 'warn' | 'error'
   rotation:
     enabled : true # Enabled by default, if disabled make sure that 'storage.logs' is pointing to a folder handled by logrotate
     maxFileSize: 12MB
@@ -152,6 +152,11 @@ csp:
   enabled: false
   report_only: true # CSP directives are still being tested, so disable the report only mode at your own risk!
   report_uri:
+
+security:
+  # Set the X-Frame-Options header to help to mitigate clickjacking attacks
+  frameguard:
+    enabled: true
 
 tracker:
   # If you disable the tracker, you disable the P2P aspect of PeerTube
@@ -224,6 +229,7 @@ contact_form:
 signup:
   enabled: false
   limit: 10 # When the limit is reached, registrations are disabled. -1 == unlimited
+  minimum_age: 16 # Used to configure the signup form
   requires_email_verification: false
   filters:
     cidr: # You can specify CIDR ranges to whitelist (empty = no filtering) or blacklist

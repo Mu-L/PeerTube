@@ -1,6 +1,6 @@
-@import '_variables';
-@import '_mixins';
-@import '_miniature';
+@use '_variables' as *;
+@use '_mixins' as *;
+@use '_miniature' as *;
 
 $more-button-width: 40px;
 
@@ -12,16 +12,8 @@ $more-button-width: 40px;
   width: calc(100% - #{$more-button-width});
 }
 
-.avatar {
-  margin: 10px 10px 0 0;
-
-  img:not(.channel) {
-    @include avatar(40px);
-  }
-
-  img.channel {
-    @include channel-avatar(40px);
-  }
+my-actor-avatar {
+  @include margin(10px, 10px, 0, 0);
 }
 
 .video-miniature-created-at-views {
@@ -49,7 +41,7 @@ $more-button-width: 40px;
 }
 
 .video-info-blocked {
-  color: red;
+  color: #ff0000;
 
   .blocked-reason::before {
     content: ' - ';
@@ -57,7 +49,7 @@ $more-button-width: 40px;
 }
 
 .video-info-nsfw {
-  color: red;
+  color: #ff0000;
 }
 
 .video-actions {
@@ -81,9 +73,9 @@ $more-button-width: 40px;
   }
 }
 
-.video-miniature {
-  &:hover ::ng-deep .video-thumbnail-actions-overlay,
-  &:hover .video-actions ::ng-deep .dropdown-root {
+.video-miniature:hover {
+  ::ng-deep .video-thumbnail-actions-overlay,
+  .video-actions ::ng-deep .dropdown-root {
     opacity: 1 !important;
   }
 }
@@ -103,6 +95,7 @@ $more-button-width: 40px;
   .video-bottom {
     display: flex;
     width: 100%;
+    min-width: 1px;
   }
 
   .video-miniature-name {
@@ -153,18 +146,20 @@ $more-button-width: 40px;
 
   .video-bottom {
     display: flex;
+    min-width: 1px;
   }
 
   // We don't display avatar in row mode
-  .avatar {
+  .channel-avatar {
     display: none;
   }
 
   my-video-thumbnail {
+    @include margin-right(10px);
+
     min-width: var(--rowThumbnailWidth);
     max-width: var(--rowThumbnailWidth);
     height: var(--rowThumbnailHeight);
-    margin-right: 10px;
   }
 
   .video-miniature-name {

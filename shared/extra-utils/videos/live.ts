@@ -119,7 +119,7 @@ async function testFfmpegStreamError (command: ffmpeg.FfmpegCommand, shouldHaveE
   let error: Error
 
   try {
-    await waitFfmpegUntilError(command, 25000)
+    await waitFfmpegUntilError(command, 35000)
   } catch (err) {
     error = err
   }
@@ -175,6 +175,12 @@ async function waitUntilLiveSaved (url: string, token: string, videoId: number |
   } while (video.isLive === true && video.state.id !== VideoState.PUBLISHED)
 }
 
+async function waitUntilLivePublishedOnAllServers (servers: ServerInfo[], videoId: string) {
+  for (const server of servers) {
+    await waitUntilLivePublished(server.url, server.accessToken, videoId)
+  }
+}
+
 async function checkLiveCleanup (server: ServerInfo, videoUUID: string, resolutions: number[] = []) {
   const basePath = buildServerDirectory(server, 'streaming-playlists')
   const hlsPath = join(basePath, 'hls', videoUUID)
@@ -226,6 +232,7 @@ export {
   sendRTMPStreamInVideo,
   waitUntilLiveEnded,
   waitFfmpegUntilError,
+  waitUntilLivePublishedOnAllServers,
   sendRTMPStream,
   testFfmpegStreamError
 }

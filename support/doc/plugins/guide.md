@@ -15,17 +15,21 @@
     - [Add custom routes](#add-custom-routes)
     - [Add external auth methods](#add-external-auth-methods)
     - [Add new transcoding profiles](#add-new-transcoding-profiles)
-  - [Helpers](#helpers)
+    - [Server helpers](#server-helpers)
   - [Client API (themes & plugins)](#client-api-themes--plugins)
     - [Plugin static route](#plugin-static-route)
     - [Notifier](#notifier)
     - [Markdown Renderer](#markdown-renderer)
+    - [Auth header](#auth-header)
+    - [Plugin router route](#plugin-router-route)
     - [Custom Modal](#custom-modal)
     - [Translate](#translate)
     - [Get public settings](#get-public-settings)
     - [Get server config](#get-server-config)
     - [Add custom fields to video form](#add-custom-fields-to-video-form)
     - [Register settings script](#register-settings-script)
+    - [HTML placeholder elements](#html-placeholder-elements)
+    - [Add/remove left menu links](#addremove-left-menu-links)
   - [Publishing](#publishing)
 - [Write a plugin/theme](#write-a-plugintheme)
   - [Clone the quickstart repository](#clone-the-quickstart-repository)
@@ -37,6 +41,7 @@
   - [Build your plugin](#build-your-plugin)
   - [Test your plugin/theme](#test-your-plugintheme)
   - [Publish](#publish)
+  - [Unpublish](#unpublish)
 - [Plugin & Theme hooks/helpers API](#plugin--theme-hookshelpers-api)
 - [Tips](#tips)
   - [Compatibility with PeerTube](#compatibility-with-peertube)
@@ -171,9 +176,18 @@ function register (...) {
   registerSetting({
     name: 'admin-name',
     label: 'Admin name',
+
     type: 'input',
-    // type: input | input-checkbox | input-password | input-textarea | markdown-text | markdown-enhanced | 'select' | 'html'
-    default: 'my super name'
+    // type: 'input' | 'input-checkbox' | 'input-password' | 'input-textarea' | 'markdown-text' | 'markdown-enhanced' | 'select' | 'html'
+
+    // Optional
+    descriptionHTML: 'The purpose of this field is...',
+
+    default: 'my super name',
+
+    // If the setting is not private, anyone can view its value (client code included)
+    // If the setting is private, only server-side hooks can access it
+    private: false
   })
 
   const adminName = await settingsManager.getSetting('admin-name')
@@ -194,9 +208,27 @@ Plugins can store/load JSON data, that PeerTube will store in its database (so d
 Example:
 
 ```js
-function register (...) {
+function register ({
+  storageManager
+}) {
   const value = await storageManager.getData('mykey')
   await storageManager.storeData('mykey', { subkey: 'value' })
+}
+```
+
+You can also store files in the plugin data directory (`/{plugins-directory}/data/{npm-plugin-name}`) **in PeerTube >= 3.2**.
+This directory and its content won't be deleted when your plugin is uninstalled/upgraded.
+
+```js
+function register ({
+  storageManager,
+  peertubeHelpers
+}) {
+  const basePath = peertubeHelpers.plugin.getDataDirectoryPath()
+
+  fs.writeFile(path.join(basePath, 'filename.txt'), 'content of my file', function (err) {
+    ...
+  })
 }
 ```
 
@@ -225,9 +257,27 @@ function register (...) {
 You can create custom routes using an [express Router](https://expressjs.com/en/4x/api.html#router) for your plugin:
 
 ```js
-function register (...) {
+function register ({
+  router
+}) {
   const router = getRouter()
   router.get('/ping', (req, res) => res.json({ message: 'pong' }))
+
+  // Users are automatically authenticated
+  router.get('/auth', async (res, res) => {
+    const user = await peertubeHelpers.user.getAuthUser(res)
+
+    const isAdmin = user.role === 0
+    const isModerator = user.role === 1
+    const isUser = user.role === 2
+
+    res.json({
+      username: user.username,
+      isAdmin,
+      isModerator,
+      isUser
+    })
+  })
 }
 ```
 
@@ -424,7 +474,7 @@ async function register ({
 During live transcode input options are applied once for each target resolution.
 Plugins are responsible for detecting such situation and applying input options only once if necessary.
 
-### Helpers
+#### Server helpers
 
 PeerTube provides your plugin some helpers. For example:
 
@@ -486,6 +536,51 @@ function register (...) {
 
   await markdownRenderer.enhancedMarkdownToHTML('![alt-img](http://.../my-image.jpg)')
   // return <img alt=alt-img src=http://.../my-image.jpg />
+}
+```
+
+#### Auth header
+
+**PeerTube >= 3.2**
+
+To make your own HTTP requests using the current authenticated user, use an helper to automatically set appropriate headers:
+
+```js
+function register (...) {
+  registerHook({
+    target: 'action:auth-user.information-loaded',
+    handler: ({ user }) => {
+
+      // Useless because we have the same info in the ({ user }) parameter
+      // It's just an example
+      fetch('/api/v1/users/me', {
+        method: 'GET',
+        headers: peertubeHelpers.getAuthHeader()
+      }).then(res => res.json())
+        .then(data => console.log('Hi %s.', data.username))
+    }
+  })
+}
+```
+
+#### Plugin router route
+
+**PeerTube >= 3.3**
+
+To get your plugin router route, you can use `peertubeHelpers.getBaseRouterRoute()`:
+
+```js
+function register (...) {
+  registerHook({
+    target: 'action:video-watch.video.loaded',
+    handler: ({ video }) => {
+      fetch(peertubeHelpers.getBaseRouterRoute() + '/my/plugin/api', {
+        method: 'GET',
+        headers: peertubeHelpers.getAuthHeader()
+      }).then(res => res.json())
+        .then(data => console.log('Hi %s.', data))
+    }
+  })
 }
 ```
 
@@ -561,10 +656,16 @@ async function register ({ registerVideoField, peertubeHelpers }) {
     label: 'My added field',
     descriptionHTML: 'Optional description',
     type: 'input-textarea',
-    default: ''
+    default: '',
+    // Optional, to hide a field depending on the current form state
+    // liveVideo is in the options object when the user is creating/updating a live
+    // videoToUpdate is in the options object when the user is updating a video
+    hidden: ({ formValues, videoToUpdate, liveVideo }) => {
+      return formValues.pluginData['other-field'] === 'toto'
+    }
   }
 
-  for (const type of [ 'upload', 'import-url', 'import-torrent', 'update' ]) {
+  for (const type of [ 'upload', 'import-url', 'import-torrent', 'update', 'go-live' ]) {
     registerVideoField(commonOptions, { type })
   }
 }
@@ -628,11 +729,32 @@ async function register ({ registerSettingsScript }) {
 }
 ```
 
+#### HTML placeholder elements
+
+PeerTube provides some HTML id so plugins can easily insert their own element:
+
+```js
+async function register (...) {
+  const elem = document.createElement('div')
+  elem.className = 'hello-world-h4'
+  elem.innerHTML = '<h4>Hello everybody! This is an element next to the player</h4>'
+
+  document.getElementById('plugin-placeholder-player-next').appendChild(elem)
+}
+```
+
+See the complete list on https://docs.joinpeertube.org/api-plugins
+
+#### Add/remove left menu links
+
+Left menu links can be filtered (add/remove a section or add/remove links) using the `filter:left-menu.links.create.result` client hook.
+
 
 ### Publishing
 
-PeerTube plugins and themes should be published on [NPM](https://www.npmjs.com/) so that PeerTube indexes
-take into account your plugin (after ~ 1 day). An official PeerTube index is available on https://packages.joinpeertube.org/ (it's just a REST API, so don't expect a beautiful website).
+PeerTube plugins and themes should be published on [NPM](https://www.npmjs.com/) so that PeerTube indexes take into account your plugin (after ~ 1 day). An official plugin index is available on [packages.joinpeertube.org](https://packages.joinpeertube.org/api/v1/plugins), with no interface to present packages.
+
+> The official plugin index source code is available at https://framagit.org/framasoft/peertube/plugin-index
 
 ## Write a plugin/theme
 
@@ -728,7 +850,7 @@ If you want to translate strings of your plugin (like labels of your registered 
 {
   ...,
   "translations": {
-    "fr-FR": "./languages/fr.json",
+    "fr": "./languages/fr.json",
     "pt-BR": "./languages/pt-BR.json"
   },
   ...
@@ -736,7 +858,6 @@ If you want to translate strings of your plugin (like labels of your registered 
 ```
 
 The key should be one of the locales defined in [i18n.ts](https://github.com/Chocobozzz/PeerTube/blob/develop/shared/models/i18n/i18n.ts).
-You **must** use the complete locales (`fr-FR` instead of `fr`).
 
 Translation files are just objects, with the english sentence as the key and the translation as the value.
 `fr.json` could contain for example:
@@ -818,6 +939,20 @@ $ npm publish
 Every time you want to publish another version of your plugin/theme, just update the `version` key from the `package.json`
 and republish it on NPM. Remember that the PeerTube index will take into account your new plugin/theme version after ~24 hours.
 
+> If you need to force your plugin update on a specific __PeerTube__ instance, you may update the latest available version manually:
+> ```sql
+> UPDATE "plugin" SET "latestVersion" = 'X.X.X' WHERE "plugin"."name" = 'plugin-shortname';
+> ```
+> You'll then be able to click the __Update plugin__ button on the plugin list.
+
+### Unpublish
+
+If for a particular reason you don't want to maintain your plugin/theme anymore
+you can deprecate it. The plugin index will automatically remove it preventing users to find/install it from the PeerTube admin interface:
+
+```bash
+$ npm deprecate peertube-plugin-xxx@"> 0.0.0" "explain here why you deprecate your plugin/theme"
+```
 
 ## Plugin & Theme hooks/helpers API
 

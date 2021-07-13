@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http'
 import { Component, OnDestroy, OnInit } from '@angular/core'
 import { ActivatedRoute, Router } from '@angular/router'
 import { AuthService, Notifier, ServerService } from '@app/core'
-import { uploadErrorHandler } from '@app/helpers'
+import { genericUploadErrorHandler } from '@app/helpers'
 import {
   VIDEO_CHANNEL_DESCRIPTION_VALIDATOR,
   VIDEO_CHANNEL_DISPLAY_NAME_VALIDATOR,
@@ -11,7 +11,7 @@ import {
 } from '@app/shared/form-validators/video-channel-validators'
 import { FormValidatorService } from '@app/shared/shared-forms'
 import { VideoChannel, VideoChannelService } from '@app/shared/shared-main'
-import { ServerConfig, VideoChannelUpdate } from '@shared/models'
+import { HTMLServerConfig, VideoChannelUpdate } from '@shared/models'
 import { MyVideoChannelEdit } from './my-video-channel-edit'
 
 @Component({
@@ -25,7 +25,7 @@ export class MyVideoChannelUpdateComponent extends MyVideoChannelEdit implements
 
   private paramsSub: Subscription
   private oldSupportField: string
-  private serverConfig: ServerConfig
+  private serverConfig: HTMLServerConfig
 
   constructor (
     protected formValidatorService: FormValidatorService,
@@ -40,9 +40,7 @@ export class MyVideoChannelUpdateComponent extends MyVideoChannelEdit implements
   }
 
   ngOnInit () {
-    this.serverConfig = this.serverService.getTmpConfig()
-    this.serverService.getConfig()
-        .subscribe(config => this.serverConfig = config)
+    this.serverConfig = this.serverService.getHTMLConfig()
 
     this.buildForm({
       'display-name': VIDEO_CHANNEL_DISPLAY_NAME_VALIDATOR,
@@ -109,7 +107,7 @@ export class MyVideoChannelUpdateComponent extends MyVideoChannelEdit implements
             this.videoChannel.updateAvatar(data.avatar)
           },
 
-          (err: HttpErrorResponse) => uploadErrorHandler({
+          (err: HttpErrorResponse) => genericUploadErrorHandler({
             err,
             name: $localize`avatar`,
             notifier: this.notifier
@@ -139,7 +137,7 @@ export class MyVideoChannelUpdateComponent extends MyVideoChannelEdit implements
             this.videoChannel.updateBanner(data.banner)
           },
 
-          (err: HttpErrorResponse) => uploadErrorHandler({
+          (err: HttpErrorResponse) => genericUploadErrorHandler({
             err,
             name: $localize`banner`,
             notifier: this.notifier

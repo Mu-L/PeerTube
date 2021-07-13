@@ -1,13 +1,13 @@
-@import '_variables';
-@import '_mixins';
+@use '_variables' as *;
+@use '_mixins' as *;
 
 .row {
+  @include sub-menu-h1;
+
   flex-direction: column;
   width: 100%;
 
-  & > my-top-menu-dropdown:nth-child(1) {
+  > my-top-menu-dropdown:nth-child(1) {
     flex-grow: 1;
   }
-
-  @include sub-menu-h1;
 }

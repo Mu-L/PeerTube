@@ -1,5 +1,6 @@
-@import 'miniature';
-@import 'mixins';
+@use 'sass:math';
+@use '_miniature' as *;
+@use '_mixins' as *;
 
 .chip {
   @include chip;
@@ -13,15 +14,15 @@
   display: inline-flex;
 
   .video-table-video-image {
-    @include miniature-thumbnail;
-
     $image-height: 45px;
 
+    @include miniature-thumbnail;
+    @include margin-right(0.5rem);
+
     height: $image-height;
-    width: #{(16/9) * $image-height};
-    margin-right: 0.5rem;
+    width: #{math.div(16, 9) * $image-height};
     border-radius: 2px;
-    border: none;
+    border: 0;
     background: transparent;
     display: inline-flex;
     justify-content: center;
@@ -59,9 +60,10 @@
     line-height: 1rem;
 
     div .glyphicon {
+      @include margin-left(0.1rem);
+
       font-size: 80%;
-      color: gray;
-      margin-left: 0.1rem;
+      color: #808080;
     }
 
     div + div {

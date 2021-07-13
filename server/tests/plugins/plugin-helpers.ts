@@ -100,13 +100,51 @@ describe('Test plugin helpers', function () {
 
       expect(res.body.staticRoute).to.equal('/plugins/test-four/0.0.1/static/')
     })
+
+    it('Should get the base static route', async function () {
+      const baseRouter = '/plugins/test-four/0.0.1/router/'
+
+      const res = await makeGetRequest({
+        url: servers[0].url,
+        path: baseRouter + 'router-route',
+        statusCodeExpected: HttpStatusCode.OK_200
+      })
+
+      expect(res.body.routerRoute).to.equal(baseRouter)
+    })
+  })
+
+  describe('User', function () {
+
+    it('Should not get a user if not authenticated', async function () {
+      await makeGetRequest({
+        url: servers[0].url,
+        path: '/plugins/test-four/router/user',
+        statusCodeExpected: HttpStatusCode.NOT_FOUND_404
+      })
+    })
+
+    it('Should get a user if authenticated', async function () {
+      const res = await makeGetRequest({
+        url: servers[0].url,
+        token: servers[0].accessToken,
+        path: '/plugins/test-four/router/user',
+        statusCodeExpected: HttpStatusCode.OK_200
+      })
+
+      expect(res.body.username).to.equal('root')
+      expect(res.body.displayName).to.equal('root')
+      expect(res.body.isAdmin).to.be.true
+      expect(res.body.isModerator).to.be.false
+      expect(res.body.isUser).to.be.false
+    })
   })
 
   describe('Moderation', function () {
     let videoUUIDServer1: string
 
     before(async function () {
-      this.timeout(30000)
+      this.timeout(60000)
 
       {
         const res = await uploadVideoAndGetId({ server: servers[0], videoName: 'video server 1' })

@@ -1,3 +1,4 @@
+import { UploadFiles } from 'express'
 import { Transaction } from 'sequelize/types'
 import { DEFAULT_AUDIO_RESOLUTION, JOB_PRIORITY } from '@server/initializers/constants'
 import { sequelizeTypescript } from '@server/initializers/database'
@@ -9,7 +10,7 @@ import { ThumbnailType, VideoCreate, VideoPrivacy, VideoTranscodingPayload } fro
 import { federateVideoIfNeeded } from './activitypub/videos'
 import { JobQueue } from './job-queue/job-queue'
 import { Notifier } from './notifier'
-import { createVideoMiniatureFromExisting } from './thumbnail'
+import { updateVideoMiniatureFromExisting } from './thumbnail'
 
 function buildLocalVideoFromReq (videoInfo: VideoCreate, channelId: number): FilteredModelAttributes<VideoModel> {
   return {
@@ -27,12 +28,14 @@ function buildLocalVideoFromReq (videoInfo: VideoCreate, channelId: number): Fil
     privacy: videoInfo.privacy || VideoPrivacy.PRIVATE,
     channelId: channelId,
     originallyPublishedAt: videoInfo.originallyPublishedAt
+      ? new Date(videoInfo.originallyPublishedAt)
+      : null
   }
 }
 
 async function buildVideoThumbnailsFromReq (options: {
   video: MVideoThumbnail
-  files: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[]
+  files: UploadFiles
   fallback: (type: ThumbnailType) => Promise<MThumbnail>
   automaticallyGenerated?: boolean
 }) {
@@ -51,7 +54,7 @@ async function buildVideoThumbnailsFromReq (options: {
     const fields = files?.[p.fieldName]
 
     if (fields) {
-      return createVideoMiniatureFromExisting({
+      return updateVideoMiniatureFromExisting({
         inputPath: fields[0].path,
         video,
         type: p.type,
@@ -121,19 +124,19 @@ async function addOptimizeOrMergeAudioJob (video: MVideo, videoFile: MVideoFile,
   }
 
   const jobOptions = {
-    priority: JOB_PRIORITY.TRANSCODING.OPTIMIZER + await getJobTranscodingPriorityMalus(user)
+    priority: await getTranscodingJobPriority(user)
   }
 
   return JobQueue.Instance.createJobWithPromise({ type: 'video-transcoding', payload: dataInput }, jobOptions)
 }
 
-async function getJobTranscodingPriorityMalus (user: MUserId) {
+async function getTranscodingJobPriority (user: MUserId) {
   const now = new Date()
   const lastWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
 
   const videoUploadedByUser = await VideoModel.countVideosUploadedByUserSince(user.id, lastWeek)
 
-  return videoUploadedByUser
+  return JOB_PRIORITY.TRANSCODING + videoUploadedByUser
 }
 
 // ---------------------------------------------------------------------------
@@ -144,5 +147,5 @@ export {
   buildVideoThumbnailsFromReq,
   setVideoTags,
   addOptimizeOrMergeAudioJob,
-  getJobTranscodingPriorityMalus
+  getTranscodingJobPriority
 }

@@ -1,4 +1,5 @@
-@import '_variables';
+@use '_variables' as *;
+@use '_mixins' as *;
 
 @mixin section-label-responsive {
   color: pvar(--mainColor);
@@ -17,7 +18,7 @@
 @mixin show-more-description {
   color: pvar(--mainColor);
   cursor: pointer;
-  margin: 10px auto 45px auto;
+  margin: 10px auto 45px;
 }
 
 @mixin avatar-row-responsive ($img-margin, $grey-font-size) {
@@ -25,16 +26,13 @@
   grid-column: 1;
   margin-bottom: 30px;
 
-  .channel-avatar {
-    @include channel-avatar(120px);
-  }
-
-  .account-avatar {
-    @include avatar(120px);
+  .main-avatar {
+    @include actor-avatar-size(120px);
   }
 
   > div {
-    margin-left: $img-margin;
+    @include margin-left($img-margin);
+
     min-width: 1px;
   }
 
@@ -48,6 +46,8 @@
   }
 
   .actor-display-name {
+    @include peertube-word-wrap;
+
     display: flex;
     flex-wrap: wrap;
   }
@@ -81,12 +81,8 @@
       font-size: 22px;
     }
 
-    .channel-avatar {
-      @include channel-avatar(80px);
-    }
-
-    .account-avatar {
-      @include avatar(120px);
+    .main-avatar {
+      @include actor-avatar-size(80px);
     }
   }
 }

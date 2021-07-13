@@ -1,6 +1,6 @@
 # Dependencies
 
-Follow the below guides, and check their versions match [required external dependencies versions](https://github.com/Chocobozzz/PeerTube/blob/master/package.json#7). You can check them automatically via `sudo npx engineslist`.
+Follow the below guides, and check their versions match [required external dependencies versions](https://github.com/Chocobozzz/PeerTube/blob/master/engines.yaml). You can check them automatically via `sudo npx engineslist`.
 
 _note_: only **LTS** versions of external dependencies are supported. If no LTS version matching the version constraint is available, only **release** versions are supported.
 
@@ -30,7 +30,7 @@ _note_: only **LTS** versions of external dependencies are supported. If no LTS 
 
 2. It would be wise to disable root access and to continue this tutorial with a user with sudoers group access
 
-3. Install NodeJS 12.x:
+3. Install NodeJS 14.x:
 [https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions)
 4. Install yarn, and be sure to have [a recent version](https://github.com/yarnpkg/yarn/releases/latest):
 [https://yarnpkg.com/en/docs/install#linux-tab](https://yarnpkg.com/en/docs/install#linux-tab)
@@ -188,12 +188,20 @@ This is necessary because `ffmpeg` is not in the Fedora repos.
 7. Run:
 
 ```
-sudo dnf install nginx ffmpeg postgresql-server postgresql-contrib openssl gcc-c++ make redis git
+sudo dnf install nginx ffmpeg postgresql-server postgresql-contrib openssl gcc-c++ make redis git vim oidentd
 ffmpeg -version # Should be >= 4.1
 g++ -v # Should be >= 5.x
 ```
 
-8. Post-installation
+8. Configure nginx
+
+```
+sudo mkdir /etc/nginx/sites-available
+sudo mkdir /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-enabled/peertube /etc/nginx/conf.d/peertube.conf
+```
+
+9. Post-installation
 
 _from [PostgreSQL documentation](https://www.postgresql.org/download/linux/redhat/):_
 > Due to policies for Red Hat family distributions, the PostgreSQL installation will not be enabled for automatic start or have the database initialized automatically.
@@ -209,9 +217,12 @@ sudo systemctl start nginx.service
 # Redis
 sudo systemctl enable redis.service
 sudo systemctl start redis.service
+# oidentd
+sudo systemctl enable oidentd.service
+sudo systemctl start oidentd.service
 ```
 
-9. Firewall
+10. Firewall
 
 By default, you cannot access your server via public IP. To do so, you must configure firewall:
 
@@ -226,7 +237,7 @@ sudo firewall-cmd --permanent --zone=public --add-service=https
 sudo firewall-cmd --reload
 ```
 
-10. Configure max ports
+11. Configure max ports
 
 This is necessary if you are running dev setup, otherwise you will have errors with `nodemon`
 
@@ -307,7 +318,7 @@ brew services run redis
 ```
 
 On macOS, the `postgresql` user can be `_postgres` instead of `postgres`.
-If `sudo -u postgres createuser -P peertube` gives you an error, you can try `sudo -u _postgres createuser -U peertube`.
+If `sudo -u postgres createuser -P peertube` gives you an `unknown user: postgres` error, you can try `sudo -u _postgres createuser -U peertube`.
 
 ## Gentoo
 
@@ -321,7 +332,7 @@ dev-db/postgresql
 dev-db/redis
 dev-vcs/git
 app-arch/unzip
-dev-lang/python:2.7
+dev-lang/python
 www-servers/nginx
 
 # Optional, client for Let’s Encrypt:

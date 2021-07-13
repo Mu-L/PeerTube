@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
+import 'mocha'
 import * as chai from 'chai'
 import { omit } from 'lodash'
-import 'mocha'
 import { join } from 'path'
-import { VideoPrivacy } from '../../../../shared/models/videos/video-privacy.enum'
+import { randomInt } from '@shared/core-utils'
+import { PeerTubeProblemDocument, VideoCreateResult } from '@shared/models'
+import { HttpStatusCode } from '../../../../shared/core-utils/miscs/http-error-codes'
 import {
+  checkUploadVideoParam,
   cleanupTests,
   createUser,
   flushAndRunServer,
@@ -18,17 +21,17 @@ import {
   makePutBodyRequest,
   makeUploadRequest,
   removeVideo,
+  root,
   ServerInfo,
   setAccessTokensToServers,
-  userLogin,
-  root
+  userLogin
 } from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
 } from '../../../../shared/extra-utils/requests/check-api-params'
-import { HttpStatusCode } from '../../../../shared/core-utils/miscs/http-error-codes'
+import { VideoPrivacy } from '../../../../shared/models/videos/video-privacy.enum'
 
 const expect = chai.expect
 
@@ -39,7 +42,7 @@ describe('Test videos API validator', function () {
   let accountName: string
   let channelId: number
   let channelName: string
-  let videoId
+  let video: VideoCreateResult
 
   // ---------------------------------------------------------------
 
@@ -183,7 +186,7 @@ describe('Test videos API validator', function () {
   describe('When adding a video', function () {
     let baseCorrectParams
     const baseCorrectAttaches = {
-      videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.webm')
+      fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.webm')
     }
 
     before(function () {
@@ -206,256 +209,268 @@ describe('Test videos API validator', function () {
       }
     })
 
-    it('Should fail with nothing', async function () {
-      const fields = {}
-      const attaches = {}
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
+    function runSuite (mode: 'legacy' | 'resumable') {
 
-    it('Should fail without name', async function () {
-      const fields = omit(baseCorrectParams, 'name')
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a long name', async function () {
-      const fields = immutableAssign(baseCorrectParams, { name: 'super'.repeat(65) })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad category', async function () {
-      const fields = immutableAssign(baseCorrectParams, { category: 125 })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad licence', async function () {
-      const fields = immutableAssign(baseCorrectParams, { licence: 125 })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad language', async function () {
-      const fields = immutableAssign(baseCorrectParams, { language: 'a'.repeat(15) })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a long description', async function () {
-      const fields = immutableAssign(baseCorrectParams, { description: 'super'.repeat(2500) })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a long support text', async function () {
-      const fields = immutableAssign(baseCorrectParams, { support: 'super'.repeat(201) })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail without a channel', async function () {
-      const fields = omit(baseCorrectParams, 'channelId')
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad channel', async function () {
-      const fields = immutableAssign(baseCorrectParams, { channelId: 545454 })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with another user channel', async function () {
-      const user = {
-        username: 'fake',
-        password: 'fake_password'
-      }
-      await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
-
-      const accessTokenUser = await userLogin(server, user)
-      const res = await getMyUserInformation(server.url, accessTokenUser)
-      const customChannelId = res.body.videoChannels[0].id
-
-      const fields = immutableAssign(baseCorrectParams, { channelId: customChannelId })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: userAccessToken, fields, attaches })
-    })
-
-    it('Should fail with too many tags', async function () {
-      const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'tag2', 'tag3', 'tag4', 'tag5', 'tag6' ] })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a tag length too low', async function () {
-      const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 't' ] })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a tag length too big', async function () {
-      const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'my_super_tag_too_long_long_long_long_long_long' ] })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad schedule update (miss updateAt)', async function () {
-      const fields = immutableAssign(baseCorrectParams, { 'scheduleUpdate[privacy]': VideoPrivacy.PUBLIC })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad schedule update (wrong updateAt)', async function () {
-      const fields = immutableAssign(baseCorrectParams, {
-        'scheduleUpdate[privacy]': VideoPrivacy.PUBLIC,
-        'scheduleUpdate[updateAt]': 'toto'
-      })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a bad originally published at attribute', async function () {
-      const fields = immutableAssign(baseCorrectParams, { originallyPublishedAt: 'toto' })
-      const attaches = baseCorrectAttaches
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail without an input file', async function () {
-      const fields = baseCorrectParams
-      const attaches = {}
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with an incorrect input file', async function () {
-      const fields = baseCorrectParams
-      let attaches = {
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short_fake.webm')
-      }
-      await makeUploadRequest({
-        url: server.url,
-        path: path + '/upload',
-        token: server.accessToken,
-        fields,
-        attaches,
-        statusCodeExpected: HttpStatusCode.UNPROCESSABLE_ENTITY_422
+      it('Should fail with nothing', async function () {
+        const fields = {}
+        const attaches = {}
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
       })
 
-      attaches = {
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mkv')
-      }
-      await makeUploadRequest({
-        url: server.url,
-        path: path + '/upload',
-        token: server.accessToken,
-        fields,
-        attaches,
-        statusCodeExpected: HttpStatusCode.UNSUPPORTED_MEDIA_TYPE_415
-      })
-    })
-
-    it('Should fail with an incorrect thumbnail file', async function () {
-      const fields = baseCorrectParams
-      const attaches = {
-        thumbnailfile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4'),
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
-      }
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a big thumbnail file', async function () {
-      const fields = baseCorrectParams
-      const attaches = {
-        thumbnailfile: join(root(), 'server', 'tests', 'fixtures', 'preview-big.png'),
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
-      }
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with an incorrect preview file', async function () {
-      const fields = baseCorrectParams
-      const attaches = {
-        previewfile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4'),
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
-      }
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should fail with a big preview file', async function () {
-      const fields = baseCorrectParams
-      const attaches = {
-        previewfile: join(root(), 'server', 'tests', 'fixtures', 'preview-big.png'),
-        videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
-      }
-
-      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
-    })
-
-    it('Should succeed with the correct parameters', async function () {
-      this.timeout(10000)
-
-      const fields = baseCorrectParams
-
-      {
+      it('Should fail without name', async function () {
+        const fields = omit(baseCorrectParams, 'name')
         const attaches = baseCorrectAttaches
-        await makeUploadRequest({
-          url: server.url,
-          path: path + '/upload',
-          token: server.accessToken,
-          fields,
-          attaches,
-          statusCodeExpected: HttpStatusCode.OK_200
-        })
-      }
 
-      {
-        const attaches = immutableAssign(baseCorrectAttaches, {
-          videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
-        })
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
 
-        await makeUploadRequest({
-          url: server.url,
-          path: path + '/upload',
-          token: server.accessToken,
-          fields,
-          attaches,
-          statusCodeExpected: HttpStatusCode.OK_200
-        })
-      }
+      it('Should fail with a long name', async function () {
+        const fields = immutableAssign(baseCorrectParams, { name: 'super'.repeat(65) })
+        const attaches = baseCorrectAttaches
 
-      {
-        const attaches = immutableAssign(baseCorrectAttaches, {
-          videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.ogv')
-        })
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
 
-        await makeUploadRequest({
-          url: server.url,
-          path: path + '/upload',
-          token: server.accessToken,
-          fields,
-          attaches,
-          statusCodeExpected: HttpStatusCode.OK_200
+      it('Should fail with a bad category', async function () {
+        const fields = immutableAssign(baseCorrectParams, { category: 125 })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad licence', async function () {
+        const fields = immutableAssign(baseCorrectParams, { licence: 125 })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad language', async function () {
+        const fields = immutableAssign(baseCorrectParams, { language: 'a'.repeat(15) })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a long description', async function () {
+        const fields = immutableAssign(baseCorrectParams, { description: 'super'.repeat(2500) })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a long support text', async function () {
+        const fields = immutableAssign(baseCorrectParams, { support: 'super'.repeat(201) })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail without a channel', async function () {
+        const fields = omit(baseCorrectParams, 'channelId')
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad channel', async function () {
+        const fields = immutableAssign(baseCorrectParams, { channelId: 545454 })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with another user channel', async function () {
+        const user = {
+          username: 'fake' + randomInt(0, 1500),
+          password: 'fake_password'
+        }
+        await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
+
+        const accessTokenUser = await userLogin(server, user)
+        const res = await getMyUserInformation(server.url, accessTokenUser)
+        const customChannelId = res.body.videoChannels[0].id
+
+        const fields = immutableAssign(baseCorrectParams, { channelId: customChannelId })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, userAccessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with too many tags', async function () {
+        const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'tag2', 'tag3', 'tag4', 'tag5', 'tag6' ] })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a tag length too low', async function () {
+        const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 't' ] })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a tag length too big', async function () {
+        const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'my_super_tag_too_long_long_long_long_long_long' ] })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad schedule update (miss updateAt)', async function () {
+        const fields = immutableAssign(baseCorrectParams, { scheduleUpdate: { privacy: VideoPrivacy.PUBLIC } })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad schedule update (wrong updateAt)', async function () {
+        const fields = immutableAssign(baseCorrectParams, {
+          scheduleUpdate: {
+            privacy: VideoPrivacy.PUBLIC,
+            updateAt: 'toto'
+          }
         })
-      }
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a bad originally published at attribute', async function () {
+        const fields = immutableAssign(baseCorrectParams, { originallyPublishedAt: 'toto' })
+        const attaches = baseCorrectAttaches
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail without an input file', async function () {
+        const fields = baseCorrectParams
+        const attaches = {}
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with an incorrect input file', async function () {
+        const fields = baseCorrectParams
+        let attaches = { fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short_fake.webm') }
+
+        await checkUploadVideoParam(
+          server.url,
+          server.accessToken,
+          { ...fields, ...attaches },
+          HttpStatusCode.UNPROCESSABLE_ENTITY_422,
+          mode
+        )
+
+        attaches = { fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.mkv') }
+        await checkUploadVideoParam(
+          server.url,
+          server.accessToken,
+          { ...fields, ...attaches },
+          HttpStatusCode.UNSUPPORTED_MEDIA_TYPE_415,
+          mode
+        )
+      })
+
+      it('Should fail with an incorrect thumbnail file', async function () {
+        const fields = baseCorrectParams
+        const attaches = {
+          thumbnailfile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4'),
+          fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
+        }
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a big thumbnail file', async function () {
+        const fields = baseCorrectParams
+        const attaches = {
+          thumbnailfile: join(root(), 'server', 'tests', 'fixtures', 'preview-big.png'),
+          fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
+        }
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with an incorrect preview file', async function () {
+        const fields = baseCorrectParams
+        const attaches = {
+          previewfile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4'),
+          fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
+        }
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should fail with a big preview file', async function () {
+        const fields = baseCorrectParams
+        const attaches = {
+          previewfile: join(root(), 'server', 'tests', 'fixtures', 'preview-big.png'),
+          fixture: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
+        }
+
+        await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.BAD_REQUEST_400, mode)
+      })
+
+      it('Should report the appropriate error', async function () {
+        const fields = immutableAssign(baseCorrectParams, { language: 'a'.repeat(15) })
+        const attaches = baseCorrectAttaches
+
+        const attributes = { ...fields, ...attaches }
+        const res = await checkUploadVideoParam(server.url, server.accessToken, attributes, HttpStatusCode.BAD_REQUEST_400, mode)
+
+        const error = res.body as PeerTubeProblemDocument
+
+        if (mode === 'legacy') {
+          expect(error.docs).to.equal('https://docs.joinpeertube.org/api-rest-reference.html#operation/uploadLegacy')
+        } else {
+          expect(error.docs).to.equal('https://docs.joinpeertube.org/api-rest-reference.html#operation/uploadResumableInit')
+        }
+
+        expect(error.type).to.equal('about:blank')
+        expect(error.title).to.equal('Bad Request')
+
+        expect(error.detail).to.equal('Incorrect request parameters: language')
+        expect(error.error).to.equal('Incorrect request parameters: language')
+
+        expect(error.status).to.equal(HttpStatusCode.BAD_REQUEST_400)
+        expect(error['invalid-params'].language).to.exist
+      })
+
+      it('Should succeed with the correct parameters', async function () {
+        this.timeout(10000)
+
+        const fields = baseCorrectParams
+
+        {
+          const attaches = baseCorrectAttaches
+          await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.OK_200, mode)
+        }
+
+        {
+          const attaches = immutableAssign(baseCorrectAttaches, {
+            videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.mp4')
+          })
+
+          await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.OK_200, mode)
+        }
+
+        {
+          const attaches = immutableAssign(baseCorrectAttaches, {
+            videofile: join(root(), 'server', 'tests', 'fixtures', 'video_short.ogv')
+          })
+
+          await checkUploadVideoParam(server.url, server.accessToken, { ...fields, ...attaches }, HttpStatusCode.OK_200, mode)
+        }
+      })
+    }
+
+    describe('Resumable upload', function () {
+      runSuite('resumable')
+    })
+
+    describe('Legacy upload', function () {
+      runSuite('legacy')
     })
   })
 
@@ -475,7 +490,7 @@ describe('Test videos API validator', function () {
 
     before(async function () {
       const res = await getVideosList(server.url)
-      videoId = res.body.data[0].uuid
+      video = res.body.data[0]
     })
 
     it('Should fail with nothing', async function () {
@@ -503,79 +518,79 @@ describe('Test videos API validator', function () {
     it('Should fail with a long name', async function () {
       const fields = immutableAssign(baseCorrectParams, { name: 'super'.repeat(65) })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad category', async function () {
       const fields = immutableAssign(baseCorrectParams, { category: 125 })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad licence', async function () {
       const fields = immutableAssign(baseCorrectParams, { licence: 125 })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad language', async function () {
       const fields = immutableAssign(baseCorrectParams, { language: 'a'.repeat(15) })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a long description', async function () {
       const fields = immutableAssign(baseCorrectParams, { description: 'super'.repeat(2500) })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a long support text', async function () {
       const fields = immutableAssign(baseCorrectParams, { support: 'super'.repeat(201) })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad channel', async function () {
       const fields = immutableAssign(baseCorrectParams, { channelId: 545454 })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with too many tags', async function () {
       const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'tag2', 'tag3', 'tag4', 'tag5', 'tag6' ] })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a tag length too low', async function () {
       const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 't' ] })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a tag length too big', async function () {
       const fields = immutableAssign(baseCorrectParams, { tags: [ 'tag1', 'my_super_tag_too_long_long_long_long_long_long' ] })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad schedule update (miss updateAt)', async function () {
       const fields = immutableAssign(baseCorrectParams, { scheduleUpdate: { privacy: VideoPrivacy.PUBLIC } })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad schedule update (wrong updateAt)', async function () {
       const fields = immutableAssign(baseCorrectParams, { scheduleUpdate: { updateAt: 'toto', privacy: VideoPrivacy.PUBLIC } })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with a bad originally published at param', async function () {
       const fields = immutableAssign(baseCorrectParams, { originallyPublishedAt: 'toto' })
 
-      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+      await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
     })
 
     it('Should fail with an incorrect thumbnail file', async function () {
@@ -587,7 +602,7 @@ describe('Test videos API validator', function () {
       await makeUploadRequest({
         url: server.url,
         method: 'PUT',
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: server.accessToken,
         fields,
         attaches
@@ -603,7 +618,7 @@ describe('Test videos API validator', function () {
       await makeUploadRequest({
         url: server.url,
         method: 'PUT',
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: server.accessToken,
         fields,
         attaches
@@ -619,7 +634,7 @@ describe('Test videos API validator', function () {
       await makeUploadRequest({
         url: server.url,
         method: 'PUT',
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: server.accessToken,
         fields,
         attaches
@@ -635,7 +650,7 @@ describe('Test videos API validator', function () {
       await makeUploadRequest({
         url: server.url,
         method: 'PUT',
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: server.accessToken,
         fields,
         attaches
@@ -647,7 +662,7 @@ describe('Test videos API validator', function () {
 
       await makePutBodyRequest({
         url: server.url,
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: userAccessToken,
         fields,
         statusCodeExpected: HttpStatusCode.FORBIDDEN_403
@@ -656,12 +671,30 @@ describe('Test videos API validator', function () {
 
     it('Should fail with a video of another server')
 
+    it('Shoud report the appropriate error', async function () {
+      const fields = immutableAssign(baseCorrectParams, { licence: 125 })
+
+      const res = await makePutBodyRequest({ url: server.url, path: path + video.shortUUID, token: server.accessToken, fields })
+      const error = res.body as PeerTubeProblemDocument
+
+      expect(error.docs).to.equal('https://docs.joinpeertube.org/api-rest-reference.html#operation/putVideo')
+
+      expect(error.type).to.equal('about:blank')
+      expect(error.title).to.equal('Bad Request')
+
+      expect(error.detail).to.equal('Incorrect request parameters: licence')
+      expect(error.error).to.equal('Incorrect request parameters: licence')
+
+      expect(error.status).to.equal(HttpStatusCode.BAD_REQUEST_400)
+      expect(error['invalid-params'].licence).to.exist
+    })
+
     it('Should succeed with the correct parameters', async function () {
       const fields = baseCorrectParams
 
       await makePutBodyRequest({
         url: server.url,
-        path: path + videoId,
+        path: path + video.shortUUID,
         token: server.accessToken,
         fields,
         statusCodeExpected: HttpStatusCode.NO_CONTENT_204
@@ -678,7 +711,7 @@ describe('Test videos API validator', function () {
       })
 
       expect(res.body.data).to.be.an('array')
-      expect(res.body.data.length).to.equal(3)
+      expect(res.body.data.length).to.equal(6)
     })
 
     it('Should fail without a correct uuid', async function () {
@@ -689,8 +722,24 @@ describe('Test videos API validator', function () {
       await getVideo(server.url, '4da6fde3-88f7-4d16-b119-108df5630b06', HttpStatusCode.NOT_FOUND_404)
     })
 
+    it('Shoud report the appropriate error', async function () {
+      const res = await getVideo(server.url, 'hi', HttpStatusCode.BAD_REQUEST_400)
+      const error = res.body as PeerTubeProblemDocument
+
+      expect(error.docs).to.equal('https://docs.joinpeertube.org/api-rest-reference.html#operation/getVideo')
+
+      expect(error.type).to.equal('about:blank')
+      expect(error.title).to.equal('Bad Request')
+
+      expect(error.detail).to.equal('Incorrect request parameters: id')
+      expect(error.error).to.equal('Incorrect request parameters: id')
+
+      expect(error.status).to.equal(HttpStatusCode.BAD_REQUEST_400)
+      expect(error['invalid-params'].id).to.exist
+    })
+
     it('Should succeed with the correct parameters', async function () {
-      await getVideo(server.url, videoId)
+      await getVideo(server.url, video.shortUUID)
     })
   })
 
@@ -761,13 +810,29 @@ describe('Test videos API validator', function () {
     })
 
     it('Should fail with a video of another user without the appropriate right', async function () {
-      await removeVideo(server.url, userAccessToken, videoId, HttpStatusCode.FORBIDDEN_403)
+      await removeVideo(server.url, userAccessToken, video.uuid, HttpStatusCode.FORBIDDEN_403)
     })
 
     it('Should fail with a video of another server')
 
+    it('Shoud report the appropriate error', async function () {
+      const res = await removeVideo(server.url, server.accessToken, 'hello', HttpStatusCode.BAD_REQUEST_400)
+      const error = res.body as PeerTubeProblemDocument
+
+      expect(error.docs).to.equal('https://docs.joinpeertube.org/api-rest-reference.html#operation/delVideo')
+
+      expect(error.type).to.equal('about:blank')
+      expect(error.title).to.equal('Bad Request')
+
+      expect(error.detail).to.equal('Incorrect request parameters: id')
+      expect(error.error).to.equal('Incorrect request parameters: id')
+
+      expect(error.status).to.equal(HttpStatusCode.BAD_REQUEST_400)
+      expect(error['invalid-params'].id).to.exist
+    })
+
     it('Should succeed with the correct parameters', async function () {
-      await removeVideo(server.url, server.accessToken, videoId)
+      await removeVideo(server.url, server.accessToken, video.uuid)
     })
   })
 

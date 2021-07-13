@@ -1,16 +1,27 @@
-import { ViewportScroller } from '@angular/common'
 import { HotkeysService } from 'angular2-hotkeys'
 import * as debug from 'debug'
 import { switchMap } from 'rxjs/operators'
+import { ViewportScroller } from '@angular/common'
 import { Component, OnInit, ViewChild } from '@angular/core'
 import { Router } from '@angular/router'
+import {
+  AuthService,
+  AuthStatus,
+  AuthUser,
+  HooksService,
+  MenuSection,
+  MenuService,
+  RedirectService,
+  ScreenService,
+  ServerService,
+  UserService
+} from '@app/core'
 import { scrollToTop } from '@app/helpers'
-import { AuthService, AuthStatus, AuthUser, MenuService, RedirectService, ScreenService, ServerService, UserService } from '@app/core'
 import { LanguageChooserComponent } from '@app/menu/language-chooser.component'
 import { QuickSettingsModalComponent } from '@app/modal/quick-settings-modal.component'
-import { ServerConfig, UserRight, VideoConstant } from '@shared/models'
-import { NgbDropdown, NgbDropdownConfig } from '@ng-bootstrap/ng-bootstrap'
 import { PeertubeModalService } from '@app/shared/shared-main/peertube-modal/peertube-modal.service'
+import { NgbDropdown } from '@ng-bootstrap/ng-bootstrap'
+import { HTMLServerConfig, ServerConfig, UserRight, VideoConstant } from '@shared/models'
 
 const logger = debug('peertube:menu:MenuComponent')
 
@@ -35,8 +46,13 @@ export class MenuComponent implements OnInit {
 
   currentInterfaceLanguage: string
 
+  menuSections: MenuSection[] = []
+
   private languages: VideoConstant<string>[] = []
+
+  private htmlServerConfig: HTMLServerConfig
   private serverConfig: ServerConfig
+
   private routesPerRight: { [role in UserRight]?: string } = {
     [UserRight.MANAGE_USERS]: '/admin/users',
     [UserRight.MANAGE_SERVER_FOLLOW]: '/admin/friends',
@@ -56,69 +72,42 @@ export class MenuComponent implements OnInit {
     private screenService: ScreenService,
     private menuService: MenuService,
     private modalService: PeertubeModalService,
-    private dropdownConfig: NgbDropdownConfig,
-    private router: Router
-  ) {
-    this.dropdownConfig.container = 'body'
-  }
+    private router: Router,
+    private hooks: HooksService
+  ) { }
 
   get isInMobileView () {
     return this.screenService.isInMobileView()
   }
 
   get dropdownContainer () {
-    if (this.isInMobileView) {
-      return null
-    } else {
-      return this.dropdownConfig.container
-    }
+    if (this.isInMobileView) return null
+
+    return 'body' as 'body'
   }
 
   get language () {
     return this.languageChooserModal.getCurrentLanguage()
   }
 
-  get instanceName () {
-    return this.serverConfig.instance.name
-  }
-
   ngOnInit () {
-    this.serverConfig = this.serverService.getTmpConfig()
-    this.serverService.getConfig()
-      .subscribe(config => this.serverConfig = config)
+    this.htmlServerConfig = this.serverService.getHTMLConfig()
+    this.currentInterfaceLanguage = this.languageChooserModal.getCurrentLanguage()
 
     this.isLoggedIn = this.authService.isLoggedIn()
-    if (this.isLoggedIn === true) {
-      this.user = this.authService.getUser()
-
-      this.computeNSFWPolicy()
-      this.computeVideosLink()
-    }
-
-    this.computeAdminAccess()
-
-    this.currentInterfaceLanguage = this.languageChooserModal.getCurrentLanguage()
+    this.updateUserState()
+    this.buildMenuSections()
 
     this.authService.loginChangedSource.subscribe(
       status => {
         if (status === AuthStatus.LoggedIn) {
           this.isLoggedIn = true
-          this.user = this.authService.getUser()
-
-          this.computeAdminAccess()
-          this.computeVideosLink()
-
-          logger('Logged in.')
         } else if (status === AuthStatus.LoggedOut) {
           this.isLoggedIn = false
-          this.user = undefined
-
-          this.computeAdminAccess()
-
-          logger('Logged out.')
-        } else {
-          console.error('Unknown auth status: ' + status)
         }
+
+        this.updateUserState()
+        this.buildMenuSections()
       }
     )
 
@@ -138,6 +127,8 @@ export class MenuComponent implements OnInit {
   }
 
   isRegistrationAllowed () {
+    if (!this.serverConfig) return false
+
     return this.serverConfig.signup.allowed &&
       this.serverConfig.signup.allowedForCurrentIP
   }
@@ -246,6 +237,22 @@ export class MenuComponent implements OnInit {
     }
   }
 
+  private async buildMenuSections () {
+    const menuSections = []
+
+    if (this.isLoggedIn) {
+      menuSections.push(
+        this.menuService.buildLibraryLinks(this.user?.canSeeVideosLink)
+      )
+    }
+
+    menuSections.push(
+      this.menuService.buildCommonLinks(this.htmlServerConfig)
+    )
+
+    this.menuSections = await this.hooks.wrapObject(menuSections, 'common', 'filter:left-menu.links.create.result')
+  }
+
   private buildUserLanguages () {
     if (!this.user) {
       this.videoLanguages = []
@@ -253,7 +260,7 @@ export class MenuComponent implements OnInit {
     }
 
     if (!this.user.videoLanguages) {
-      this.videoLanguages = [$localize`any language`]
+      this.videoLanguages = [ $localize`any language` ]
       return
     }
 
@@ -269,6 +276,8 @@ export class MenuComponent implements OnInit {
   }
 
   private computeVideosLink () {
+    if (!this.isLoggedIn) return
+
     this.authService.userInformationLoaded
       .pipe(
         switchMap(() => this.user.computeCanSeeVideosLink(this.userService.getMyVideoQuotaUsed()))
@@ -297,5 +306,15 @@ export class MenuComponent implements OnInit {
         this.nsfwPolicy = $localize`display`
         break
     }
+  }
+
+  private updateUserState () {
+    this.user = this.isLoggedIn
+      ? this.authService.getUser()
+      : undefined
+
+    this.computeAdminAccess()
+    this.computeNSFWPolicy()
+    this.computeVideosLink()
   }
 }

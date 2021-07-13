@@ -1,6 +1,6 @@
-@import '_variables';
-@import '_mixins';
-@import '_miniature';
+@use '_variables' as *;
+@use '_mixins' as *;
+@use '_miniature' as *;
 
 .section-title {
   // make the element span a full grid row within .videos grid
@@ -8,7 +8,7 @@
 }
 
 .margin-content {
-  @include grid-videos-miniature-layout;
+  @include grid-videos-miniature-layout-with-margins;
 }
 
 .section {
@@ -16,7 +16,7 @@
     padding-top: 30px;
 
     .section-title {
-      border-top: none !important;
+      border-top: 0 !important;
     }
   }
 
@@ -33,12 +33,14 @@
     }
 
     a {
-      &:hover, &:focus:not(.focus-visible), &:active {
+      color: pvar(--mainForegroundColor);
+
+      &:hover,
+      &:focus:not(.focus-visible),
+      &:active {
         text-decoration: none;
         outline: none;
       }
-
-      color: pvar(--mainForegroundColor);
     }
   }
 
@@ -49,18 +51,20 @@
         width: fit-content;
         align-items: center;
 
-        img {
-          @include channel-avatar(28px);
+        my-actor-avatar {
+          @include actor-avatar-size(28px);
+          @include margin-right(8px);
 
-          margin-right: 8px;
+          font-size: initial;
         }
       }
 
       .followers {
+        @include margin-left(10px);
+
         color: pvar(--greyForegroundColor);
         font-weight: normal;
         font-size: 14px;
-        margin-left: 10px;
         position: relative;
         top: 2px;
       }
@@ -84,8 +88,9 @@
     overflow: initial;
 
     .section-title {
+      @include margin-left(10px);
+
       font-size: 17px;
-      margin-left: 10px;
     }
   }
 }

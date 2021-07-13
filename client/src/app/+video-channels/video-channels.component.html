@@ -6,24 +6,24 @@
   <div class="channel-info">
 
     <ng-template #buttonsTemplate>
-        <a *ngIf="isManageable()" [routerLink]="[ '/my-library/video-channels/update', videoChannel.nameWithHost ]" class="peertube-button-link orange-button" i18n>
-          Manage channel
-        </a>
+      <a *ngIf="isManageable()" [routerLink]="[ '/my-library/video-channels/update', videoChannel.nameWithHost ]" class="peertube-button-link orange-button" i18n>
+        Manage channel
+      </a>
 
-        <my-subscribe-button *ngIf="!isManageable()" #subscribeButton [videoChannels]="[videoChannel]"></my-subscribe-button>
+      <my-subscribe-button *ngIf="!isManageable()" #subscribeButton [videoChannels]="[videoChannel]"></my-subscribe-button>
 
-        <button *ngIf="videoChannel.support" (click)="showSupportModal()" class="support-button peertube-button orange-button-inverted">
-          <my-global-icon iconName="support" aria-hidden="true"></my-global-icon>
-          <span class="icon-text" i18n>Support</span>
-        </button>
+      <button *ngIf="videoChannel.support" (click)="showSupportModal()" class="support-button peertube-button orange-button-inverted">
+        <my-global-icon iconName="support" aria-hidden="true"></my-global-icon>
+        <span class="icon-text" i18n>Support</span>
+      </button>
     </ng-template>
 
     <ng-template #ownerTemplate>
       <div class="owner-block">
+        <div class="section-label" i18n>OWNER ACCOUNT</div>
+
         <div class="avatar-row">
-          <a [routerLink]="getAccountUrl()" title="View account" i18n-title>
-            <img class="account-avatar" [src]="videoChannel.ownerAvatarUrl" alt="Owner account avatar" />
-          </a>
+          <my-actor-avatar class="account-avatar" [account]="videoChannel.ownerAccount" [internalHref]="getAccountUrl()"></my-actor-avatar>
 
           <div class="actor-info">
             <h4>
@@ -49,7 +49,7 @@
     </ng-template>
 
     <div class="channel-avatar-row">
-      <img class="channel-avatar" [src]="videoChannel.avatarUrl" alt="Avatar" />
+      <my-actor-avatar class="main-avatar" [channel]="videoChannel"></my-actor-avatar>
 
       <div>
         <div class="section-label" i18n>VIDEO CHANNEL</div>
@@ -57,7 +57,7 @@
         <div class="actor-info">
           <div>
             <div class="actor-display-name">
-              <h1>{{ videoChannel.displayName }}</h1>
+              <h1 i18n-title [title]="'Channel created on ' + (videoChannel.createdAt | date)">{{ videoChannel.displayName }}</h1>
             </div>
 
             <div class="actor-handle">
@@ -87,8 +87,6 @@
 
     <div class="channel-description" [ngClass]="{ expanded: channelDescriptionExpanded }">
       <div class="description-html" [innerHTML]="channelDescriptionHTML"></div>
-
-      <div class="created-at" i18n>Channel created on {{ videoChannel.createdAt | date }}</div>
     </div>
 
     <div *ngIf="hasShowMoreDescription()" class="show-more" role="button"
@@ -103,15 +101,11 @@
     </div>
 
     <div class="owner-card">
-      <div class="section-label" i18n>OWNER ACCOUNT</div>
-
       <ng-template *ngTemplateOutlet="ownerTemplate"></ng-template>
     </div>
   </div>
 
   <div class="bottom-owner">
-    <div class="section-label" i18n>OWNER ACCOUNT</div>
-
     <ng-template *ngTemplateOutlet="ownerTemplate"></ng-template>
   </div>
 

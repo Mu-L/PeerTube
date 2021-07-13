@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
-import { expect } from 'chai'
 import { omit } from 'lodash'
-import { join } from 'path'
-import { User, UserRole, VideoImport, VideoImportState } from '../../../../shared'
+import { User, UserRole, VideoCreateResult } from '../../../../shared'
+import { HttpStatusCode } from '../../../../shared/core-utils/miscs/http-error-codes'
 import {
   addVideoChannel,
   blockUser,
+  buildAbsoluteFixturePath,
   cleanupTests,
   createUser,
   deleteMe,
@@ -29,7 +29,6 @@ import {
   ServerInfo,
   setAccessTokensToServers,
   unblockUser,
-  updateUser,
   uploadVideo,
   userLogin
 } from '../../../../shared/extra-utils'
@@ -39,18 +38,14 @@ import {
   checkBadSortPagination,
   checkBadStartPagination
 } from '../../../../shared/extra-utils/requests/check-api-params'
-import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
-import { getGoodVideoUrl, getMagnetURI, getMyVideoImports, importVideo } from '../../../../shared/extra-utils/videos/video-imports'
 import { UserAdminFlag } from '../../../../shared/models/users/user-flag.model'
-import { VideoPrivacy } from '../../../../shared/models/videos'
-import { HttpStatusCode } from '../../../../shared/core-utils/miscs/http-error-codes'
 
 describe('Test users API validators', function () {
   const path = '/api/v1/users/'
   let userId: number
   let rootId: number
   let moderatorId: number
-  let videoId: number
+  let video: VideoCreateResult
   let server: ServerInfo
   let serverWithRegistrationDisabled: ServerInfo
   let userAccessToken = ''
@@ -131,7 +126,7 @@ describe('Test users API validators', function () {
 
     {
       const res = await uploadVideo(server.url, server.accessToken, {})
-      videoId = res.body.video.id
+      video = res.body.video
     }
 
     {
@@ -605,7 +600,7 @@ describe('Test users API validators', function () {
     it('Should fail without an incorrect input file', async function () {
       const fields = {}
       const attaches = {
-        avatarfile: join(__dirname, '..', '..', 'fixtures', 'video_short.mp4')
+        avatarfile: buildAbsoluteFixturePath('video_short.mp4')
       }
       await makeUploadRequest({ url: server.url, path: path + '/me/avatar/pick', token: server.accessToken, fields, attaches })
     })
@@ -613,7 +608,7 @@ describe('Test users API validators', function () {
     it('Should fail with a big file', async function () {
       const fields = {}
       const attaches = {
-        avatarfile: join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
+        avatarfile: buildAbsoluteFixturePath('avatar-big.png')
       }
       await makeUploadRequest({ url: server.url, path: path + '/me/avatar/pick', token: server.accessToken, fields, attaches })
     })
@@ -621,7 +616,7 @@ describe('Test users API validators', function () {
     it('Should fail with an unauthenticated user', async function () {
       const fields = {}
       const attaches = {
-        avatarfile: join(__dirname, '..', '..', 'fixtures', 'avatar.png')
+        avatarfile: buildAbsoluteFixturePath('avatar.png')
       }
       await makeUploadRequest({
         url: server.url,
@@ -635,7 +630,7 @@ describe('Test users API validators', function () {
     it('Should succeed with the correct params', async function () {
       const fields = {}
       const attaches = {
-        avatarfile: join(__dirname, '..', '..', 'fixtures', 'avatar.png')
+        avatarfile: buildAbsoluteFixturePath('avatar.png')
       }
       await makeUploadRequest({
         url: server.url,
@@ -834,7 +829,7 @@ describe('Test users API validators', function () {
 
   describe('When getting my video rating', function () {
     it('Should fail with a non authenticated user', async function () {
-      await getMyUserVideoRating(server.url, 'fake_token', videoId, HttpStatusCode.UNAUTHORIZED_401)
+      await getMyUserVideoRating(server.url, 'fake_token', video.id, HttpStatusCode.UNAUTHORIZED_401)
     })
 
     it('Should fail with an incorrect video uuid', async function () {
@@ -846,7 +841,9 @@ describe('Test users API validators', function () {
     })
 
     it('Should succeed with the correct parameters', async function () {
-      await getMyUserVideoRating(server.url, server.accessToken, videoId)
+      await getMyUserVideoRating(server.url, server.accessToken, video.id)
+      await getMyUserVideoRating(server.url, server.accessToken, video.uuid)
+      await getMyUserVideoRating(server.url, server.accessToken, video.shortUUID)
     })
   })
 
@@ -1090,102 +1087,6 @@ describe('Test users API validators', function () {
   describe('When registering multiple users on a server with users limit', function () {
     it('Should fail when after 3 registrations', async function () {
       await registerUser(server.url, 'user42', 'super password', HttpStatusCode.FORBIDDEN_403)
-    })
-  })
-
-  describe('When having a video quota', function () {
-    it('Should fail with a user having too many videos', async function () {
-      await updateUser({
-        url: server.url,
-        userId: rootId,
-        accessToken: server.accessToken,
-        videoQuota: 42
-      })
-
-      await uploadVideo(server.url, server.accessToken, {}, HttpStatusCode.PAYLOAD_TOO_LARGE_413)
-    })
-
-    it('Should fail with a registered user having too many videos', async function () {
-      this.timeout(30000)
-
-      const user = {
-        username: 'user3',
-        password: 'my super password'
-      }
-      userAccessToken = await userLogin(server, user)
-
-      const videoAttributes = { fixture: 'video_short2.webm' }
-      await uploadVideo(server.url, userAccessToken, videoAttributes)
-      await uploadVideo(server.url, userAccessToken, videoAttributes)
-      await uploadVideo(server.url, userAccessToken, videoAttributes)
-      await uploadVideo(server.url, userAccessToken, videoAttributes)
-      await uploadVideo(server.url, userAccessToken, videoAttributes)
-      await uploadVideo(server.url, userAccessToken, videoAttributes, HttpStatusCode.PAYLOAD_TOO_LARGE_413)
-    })
-
-    it('Should fail to import with HTTP/Torrent/magnet', async function () {
-      this.timeout(120000)
-
-      const baseAttributes = {
-        channelId: 1,
-        privacy: VideoPrivacy.PUBLIC
-      }
-      await importVideo(server.url, server.accessToken, immutableAssign(baseAttributes, { targetUrl: getGoodVideoUrl() }))
-      await importVideo(server.url, server.accessToken, immutableAssign(baseAttributes, { magnetUri: getMagnetURI() }))
-      await importVideo(server.url, server.accessToken, immutableAssign(baseAttributes, { torrentfile: 'video-720p.torrent' as any }))
-
-      await waitJobs([ server ])
-
-      const res = await getMyVideoImports(server.url, server.accessToken)
-
-      expect(res.body.total).to.equal(3)
-      const videoImports: VideoImport[] = res.body.data
-      expect(videoImports).to.have.lengthOf(3)
-
-      for (const videoImport of videoImports) {
-        expect(videoImport.state.id).to.equal(VideoImportState.FAILED)
-        expect(videoImport.error).not.to.be.undefined
-        expect(videoImport.error).to.contain('user video quota is exceeded')
-      }
-    })
-  })
-
-  describe('When having a daily video quota', function () {
-    it('Should fail with a user having too many videos daily', async function () {
-      await updateUser({
-        url: server.url,
-        userId: rootId,
-        accessToken: server.accessToken,
-        videoQuotaDaily: 42
-      })
-
-      await uploadVideo(server.url, server.accessToken, {}, HttpStatusCode.PAYLOAD_TOO_LARGE_413)
-    })
-  })
-
-  describe('When having an absolute and daily video quota', function () {
-    it('Should fail if exceeding total quota', async function () {
-      await updateUser({
-        url: server.url,
-        userId: rootId,
-        accessToken: server.accessToken,
-        videoQuota: 42,
-        videoQuotaDaily: 1024 * 1024 * 1024
-      })
-
-      await uploadVideo(server.url, server.accessToken, {}, HttpStatusCode.PAYLOAD_TOO_LARGE_413)
-    })
-
-    it('Should fail if exceeding daily quota', async function () {
-      await updateUser({
-        url: server.url,
-        userId: rootId,
-        accessToken: server.accessToken,
-        videoQuota: 1024 * 1024 * 1024,
-        videoQuotaDaily: 42
-      })
-
-      await uploadVideo(server.url, server.accessToken, {}, HttpStatusCode.PAYLOAD_TOO_LARGE_413)
     })
   })
 

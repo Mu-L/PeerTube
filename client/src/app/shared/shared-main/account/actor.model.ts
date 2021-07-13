@@ -1,7 +1,7 @@
-import { Actor as ActorServer, ActorImage } from '@shared/models'
 import { getAbsoluteAPIUrl } from '@app/helpers'
+import { Actor as ServerActor, ActorImage } from '@shared/models'
 
-export abstract class Actor implements ActorServer {
+export abstract class Actor implements ServerActor {
   id: number
   name: string
 
@@ -12,10 +12,8 @@ export abstract class Actor implements ActorServer {
   followersCount: number
 
   createdAt: Date | string
-  updatedAt: Date | string
 
   avatar: ActorImage
-  avatarUrl: string
 
   isLocal: boolean
 
@@ -47,7 +45,7 @@ export abstract class Actor implements ActorServer {
     return host.trim() === thisHost
   }
 
-  protected constructor (hash: Partial<ActorServer>) {
+  protected constructor (hash: Partial<ServerActor>) {
     this.id = hash.id
     this.url = hash.url ?? ''
     this.name = hash.name ?? ''
@@ -56,7 +54,6 @@ export abstract class Actor implements ActorServer {
     this.followersCount = hash.followersCount
 
     if (hash.createdAt) this.createdAt = new Date(hash.createdAt.toString())
-    if (hash.updatedAt) this.updatedAt = new Date(hash.updatedAt.toString())
 
     this.avatar = hash.avatar
     this.isLocal = Actor.IS_LOCAL(this.host)

@@ -1,5 +1,5 @@
-@import '_variables';
-@import '_mixins';
+@use '_variables' as *;
+@use '_mixins' as *;
 
 .alert {
   font-size: 15px;
@@ -84,7 +84,7 @@ button {
       border-color: pvar(--mainColor) transparent transparent transparent;
     }
 
-    & + div {
+    + div {
       font-size: 15px;
     }
   }

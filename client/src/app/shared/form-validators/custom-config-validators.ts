@@ -44,8 +44,17 @@ export const SIGNUP_LIMIT_VALIDATOR: BuildFormValidator = {
   VALIDATORS: [Validators.required, Validators.min(-1), Validators.pattern('-?[0-9]+')],
   MESSAGES: {
     'required': $localize`Signup limit is required.`,
-    'min': $localize`Signup limit must be greater than 1.`,
+    'min': $localize`Signup limit must be greater than 1. Use -1 to disable it.`,
     'pattern': $localize`Signup limit must be a number.`
+  }
+}
+
+export const SIGNUP_MINIMUM_AGE_VALIDATOR: BuildFormValidator = {
+  VALIDATORS: [Validators.required, Validators.min(1), Validators.pattern('[0-9]+')],
+  MESSAGES: {
+    'required': $localize`Signup minimum age is required.`,
+    'min': $localize`Signup minimum age must be greater than 1.`,
+    'pattern': $localize`Signup minimum age must be a number.`
   }
 }
 

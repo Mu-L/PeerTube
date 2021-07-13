@@ -19,6 +19,9 @@ database:
   suffix: "PEERTUBE_DB_SUFFIX"
   username: "PEERTUBE_DB_USERNAME"
   password: "PEERTUBE_DB_PASSWORD"
+  ssl:
+    __name: "PEERTUBE_DB_SSL"
+    __format: "json"
 
 redis:
   hostname: "PEERTUBE_REDIS_HOSTNAME"
@@ -43,6 +46,7 @@ smtp:
   from_address: "PEERTUBE_SMTP_FROM"
 
 log:
+  level: "PEERTUBE_LOG_LEVEL"
   log_ping_requests:
     __name: "PEERTUBE_LOG_PING_REQUESTS"
     __format: "json"
