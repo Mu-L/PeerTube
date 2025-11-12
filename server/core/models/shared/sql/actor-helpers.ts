@@ -20,29 +20,44 @@ export function getActorJoin (options: {
 export function getChannelJoin (options: {
   base?: string
   on: string
-  includeAccount?: boolean // default false
-  includeAvatars?: boolean // default false
+  includeAccount: boolean
+  includeAvatars: boolean
+  includeActors: boolean
 }) {
-  const { base = '', on, includeAccount = false, includeAvatars = false } = options
+  const { base = '', on, includeAccount, includeAvatars, includeActors } = options
 
   const accountJoin = includeAccount
-    ? getAccountJoin({ base: `${base}VideoChannel->`, on: `"${base}VideoChannel"."accountId"`, includeAvatars })
+    ? getAccountJoin({
+      base: `${base}VideoChannel->`,
+      on: `"${base}VideoChannel"."accountId"`,
+      includeAvatars,
+      includeActor: includeActors
+    })
+    : ''
+
+  const actorJoin = includeActors
+    ? getActorJoin({ base: `${base}VideoChannel->`, on: `"${base}VideoChannel"."actorId"`, includeAvatars })
     : ''
 
   return ` LEFT JOIN "videoChannel" "${base}VideoChannel" ON "${base}VideoChannel"."id" = ${on} ` +
-    getActorJoin({ base: `${base}VideoChannel->`, on: `"${base}VideoChannel"."actorId"`, includeAvatars }) +
+    actorJoin +
     accountJoin
 }
 
 export function getAccountJoin (options: {
   base?: string
   on: string
-  includeAvatars?: boolean // default false
+  includeAvatars: boolean
+  includeActor: boolean
 }) {
-  const { base = '', on, includeAvatars = false } = options
+  const { base = '', on, includeAvatars, includeActor } = options
 
-  return `LEFT JOIN "account" "${base}Account" ON "${base}Account"."id" = ${on} ` +
-    getActorJoin({ base: `${base}Account->`, on: `"${base}Account"."actorId"`, includeAvatars })
+  const actorJoin = includeActor
+    ? getActorJoin({ base: `${base}Account->`, on: `"${base}Account"."actorId"`, includeAvatars })
+    : ''
+
+  return ` LEFT JOIN "account" "${base}Account" ON "${base}Account"."id" = ${on} ` +
+    actorJoin
 }
 
 export function getAvatarsJoin (options: {
@@ -51,7 +66,7 @@ export function getAvatarsJoin (options: {
 }) {
   const { base = '', on } = options
 
-  return `LEFT JOIN "actorImage" "${base}Avatars" ` +
+  return ` LEFT JOIN "actorImage" "${base}Avatars" ` +
     `ON "${base}Avatars"."actorId" = ${on} ` +
     `AND "${base}Avatars"."type" = ${ActorImageType.AVATAR} `
 }
